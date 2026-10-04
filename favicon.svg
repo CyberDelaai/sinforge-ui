@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.2" result="b1"/>
+      <feGaussianBlur stdDeviation="3" result="b2"/>
+      <feGaussianBlur stdDeviation="6" result="b3"/>
+      <feMerge>
+        <feMergeNode in="b3"/>
+        <feMergeNode in="b2"/>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="64" height="64" fill="#000"/>
+  <!-- SINFORGE: an ID card — card outline, photo box, three data lines -->
+  <g filter="url(#glow)" fill="none" stroke="#fcee0a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="10" y="17" width="44" height="30" rx="3"/>
+    <rect x="16" y="23" width="12" height="15" rx="1"/>
+    <path d="M34 26 H48 M34 32 H48 M34 38 H42"/>
+  </g>
+</svg>
