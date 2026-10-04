@@ -5,10 +5,11 @@ Items are removed from the list once they are implemented / resolved (no archive
 
 ## BIG (Y version bump)
 
-1. Decide the core feature set (document types — ID card / badge / keycard,
-   photo upload + crop, editable text fields, cyberpunk layout styles, barcode /
-   chip decorations, print sizes) and build the first working document pipeline
-   with PNG export.
+1. More blanks: ID card (horizontal, CR80 proportions), keycard, corp badge.
+2. More decorations (chip, hologram sticker, QR-like code, corner brackets,
+   warning labels) and per-element colour choices.
+3. More effects: glitch slices, RGB split, worn/scratched print, holo foil.
+4. Presets: save / load complete documents (text + look), with built-in examples.
 
 ## SMALL (Z version bump)
 

@@ -153,6 +153,8 @@
   .btn:disabled { opacity: .4; cursor: not-allowed; background: transparent; box-shadow: none; }
   .btn-sm { height: 36px; padding: 0 12px; font-size: 12px; letter-spacing: 2px; }
   .btn-block { width: 100%; margin-top: 16px; }
+  .btn-block + .btn-block { margin-top: 10px; }
+  .btn-alt { --btn-color: var(--main); }
 
   /* shared sliding two-state toggle (ported from chronos-ui .side-switch) */
   .fx-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
@@ -231,4 +233,102 @@
     position: fixed; left: 0; right: 0; bottom: 6px; z-index: 0;
     text-align: center; font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
     color: rgba(255, 255, 255, 0.15); pointer-events: none; user-select: none;
+  }
+
+  /* ---------- SINFORGE panels ---------- */
+  .config-col { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 22px; align-self: flex-start; }
+  .config-col .config { width: 100%; }
+  .config h3.sub {
+    font-size: 11px; letter-spacing: 2px; color: var(--yellow); font-weight: 700;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .config .hint.mt, .config .mt { margin-top: 10px; }
+  [data-shows][hidden] { display: none; }
+  .btn-row { display: flex; gap: 8px; }
+  .field-row { display: flex; gap: 8px; align-items: stretch; }
+  .field-row input { flex: 1; min-width: 0; }
+  .btn-icon { flex: 0 0 40px; height: auto; padding: 0; --aug-tl: 8px; --aug-br: 8px; }
+  .btn-icon svg { width: 18px; height: 18px; pointer-events: none; }
+  .btn-row .btn { flex: 1; padding: 0 6px; }
+
+  /* range sliders — cyan thumb on a dim track (ported from eidolon / gridmap-ui POTENCY) */
+  .potency-slider {
+    -webkit-appearance: none; appearance: none; width: 112px; height: 4px;
+    background: rgba(var(--main-rgb),0.25); cursor: pointer; outline: none; flex-shrink: 0;
+  }
+  .potency-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 12px; height: 16px;
+    background: var(--main); border: none; cursor: pointer;
+  }
+  .potency-slider::-moz-range-thumb {
+    width: 12px; height: 16px; background: var(--main); border: none; border-radius: 0; cursor: pointer;
+  }
+  .potency-slider:hover::-webkit-slider-thumb { box-shadow: 0 0 8px rgba(var(--main-rgb),0.7); }
+  .potency-slider:hover::-moz-range-thumb { box-shadow: 0 0 8px rgba(var(--main-rgb),0.7); }
+  .potency-slider:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+  .fx-label .val { color: var(--accent); font-weight: 700; letter-spacing: 1px; }
+
+  /* dropdowns (ported from eidolon / gridmap-ui .scale-select) */
+  .scale-select {
+    background: var(--panel); color: var(--main); border: 1px solid rgba(var(--main-rgb),0.4);
+    padding: 6px 8px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; width: 158px; flex-shrink: 0;
+  }
+  .scale-select.wide { width: 100%; }
+  .scale-select:focus { outline: none; border-color: var(--main); box-shadow: 0 0 6px rgba(var(--main-rgb),0.4); }
+
+  /* colour swatch: a clickable augmented-ui rectangle opening a hidden colour input */
+  .fill-group { position: relative; display: flex; align-items: center; width: 112px; flex-shrink: 0; }
+  .fill-swatch {
+    flex: 1; height: 30px; cursor: pointer; border: none; padding: 0;
+    --aug-border-all: 1px; --aug-border-bg: rgba(255, 255, 255, 0.35);
+    --aug-tl: 8px; --aug-br: 8px;
+  }
+  .fill-swatch:hover { --aug-border-bg: var(--main); }
+  .fill-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  /* rotation wheel: the needle points where the rotated content runs */
+  .dial {
+    --angle: 0deg;
+    position: relative; width: 44px; height: 44px; flex-shrink: 0; margin-right: 34px;
+    border-radius: 50%; border: 1px solid rgba(var(--main-rgb),0.45);
+    background:
+      repeating-conic-gradient(from -1deg, rgba(var(--main-rgb),0.5) 0 2deg, transparent 2deg 45deg),
+      radial-gradient(circle, var(--panel) 0 62%, transparent 63%);
+    cursor: grab; touch-action: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .dial:hover, .dial:focus-visible { border-color: var(--main); box-shadow: 0 0 8px rgba(var(--main-rgb),0.45); outline: none; }
+  .dial.active { cursor: grabbing; }
+  .dial-needle {
+    position: absolute; left: 50%; top: 50%; width: 18px; height: 2px; margin-top: -1px;
+    background: var(--accent); transform-origin: 0 50%; transform: rotate(var(--angle));
+    box-shadow: 0 0 6px rgba(var(--accent-rgb),0.7); pointer-events: none;
+  }
+  .dial::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px;
+    margin: -3px 0 0 -3px; border-radius: 50%; background: var(--accent);
+  }
+
+  /* colour schemes: each chip shows card / ink / accent as three bands */
+  .scheme-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 4px; }
+  .scheme-chip {
+    height: 30px; padding: 0; cursor: pointer; border: 1px solid rgba(255,255,255,0.25);
+    transition: transform .1s, border-color .1s, box-shadow .1s;
+  }
+  .scheme-chip:hover { transform: scale(1.08); border-color: var(--main); }
+  .scheme-chip.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 8px rgba(var(--accent-rgb),0.6); }
+
+  /* the preview canvas: native resolution, scaled down to fit the stage */
+  .stage { padding: 24px; }
+  .stage.drop { border-color: var(--yellow); background-color: rgba(var(--accent-rgb),0.06); }
+  .doc-canvas {
+    display: block; max-width: 100%; max-height: calc(100vh - 240px); min-height: 400px;
+    width: auto; height: auto; object-fit: contain; touch-action: none;
+  }
+  .doc-canvas.over-photo { cursor: grab; }
+  .doc-canvas.dragging { cursor: grabbing; }
+
+  @media (max-width: 1100px) {
+    .config-col { width: 100%; }
   }
