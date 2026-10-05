@@ -55,7 +55,9 @@
   // runs on to 878 (40 above the inner contour, as the photo sits 40 below the
   // issuer band) when the MRZ is off — the photo window grows to match.
   const ID_BOTTOM = { mrz: 800, full: 878 };
-  const idPortrait = (b) => ({ box: { x: 130, y: 220, w: 440, h: b - 220 }, cut: 60, line: 14 });
+  // The box's left edge sits half a frame line (7) inside x = 150, so the frame's
+  // outer edge lines up with the issuer band and the MRZ rule.
+  const idPortrait = (b) => ({ box: { x: 157, y: 220, w: 413, h: b - 220 }, cut: 60, line: 14 });
   const ID_PORTRAIT = { mrz: idPortrait(ID_BOTTOM.mrz), full: idPortrait(ID_BOTTOM.full) };
 
   const blanks = {
@@ -197,22 +199,32 @@
         ctx.strokeStyle = ink; ctx.lineWidth = 5; ctx.lineJoin = 'miter';
         ctx.stroke();
 
-        // issuer band: solid ink, the issuer in the card colour, slashes trailing it
-        gfx.poly(ctx, [[150, 100], [1470, 100], [1470, 146], [1436, 180], [150, 180]]);
+        // issuer band: solid ink, the issuer in the card colour, slashes trailing it.
+        // Its top sits 28 below the inner contour and both top corners clear the
+        // contour's chamfers by the same ≈28, so it never touches the frame; its
+        // top-left and bottom-right corners are notched with parallel "/" cuts.
+        gfx.poly(ctx, [[180, 120], [1450, 120], [1450, 150], [1420, 180], [150, 180], [150, 150]]);
         ctx.fillStyle = ink;
         ctx.fill();
-        const issW = gfx.text(ctx, doc.issuer, 180, 158, { size: 50, maxW: 1000, color: st.card, spacing: 0.04 });
+        const ISS = 42;
+        const issBase = 150 + gfx.ascent(ctx, 'H', 700, ISS) / 2;
+        const issW = gfx.text(ctx, doc.issuer, 180, issBase, { size: ISS, maxW: 1000, color: st.card, spacing: 0.04 });
         if (st.slashes) {
           ctx.fillStyle = st.card;
           let x = 180 + issW + 30;
-          for (let i = 0; i < 3 && x < 1330; i++, x += 26) gfx.slant(ctx, x, 120, 160, 13, 20);
-          if (x < 1360) gfx.slant(ctx, x + 6, 120, 160, 1400 - x - 6, 20);
+          for (let i = 0; i < 3 && x < 1310; i++, x += 26) gfx.slant(ctx, x, 134, 166, 13, 16);
+          if (x < 1340) gfx.slant(ctx, x + 6, 134, 166, 1380 - x - 6, 16);
         }
 
-        // hazard stripes beside the photo and in the right-hand recess
+        // hazard stripes beside the photo and at the top right, under the end of
+        // the issuer band (flush with its right edge); with no chip in the recess
+        // the right run continues down to just above the barcode (or, with no
+        // barcode, to the same end as the left run)
+        const longStripes = st.stripes && !st.chip;
         if (st.stripes) {
+          const end = !longStripes ? 390 : st.barcode ? statusTop - 24 : bottom - 8;
           gfx.stripes(ctx, 596, 624, 230, bottom - 8, ink, false);
-          gfx.stripes(ctx, 1440, 1468, 446, 606, ink, true);
+          gfx.stripes(ctx, 1422, 1450, 230, end, ink, true);
         }
 
         // photo, clipped to its window, then the portrait frame
@@ -221,20 +233,21 @@
         // data fields
         const X = 660;
         let y = 222; // level with the photo window's top
-        y = field('SURNAME', doc.name2, X, y, 760, BIG);
-        y = field('GIVEN NAMES', doc.name1, X, y, 760);
+        const topW = st.stripes ? 740 : 760; // the top two rows clear the stripes
+        y = field('SURNAME', doc.name2, X, y, topW, BIG);
+        y = field('GIVEN NAMES', doc.name1, X, y, topW);
         field('SEX', doc.sex, 1180, y, 150);
         y = field('SIN NO.', doc.number, X, y, 470);
-        const chipTop = y;
         field('EXPIRES', doc.expires, 950, y, 270);
         y = field('DATE OF BIRTH', doc.dob, X, y, 270);
-        y = field('DISTRICT', doc.district, X, y, st.chip ? 560 : 760);
+        y = field('DISTRICT', doc.district, X, y, longStripes ? 740 : 760);
 
         // contact chip in the accent colour
         if (st.chip) {
-          // centred on the DOB → DISTRICT rows, no taller than a real chip's proportions
-          const span = y - ROW_GAP - chipTop - 4, cw = 160, ch = Math.min(span, 160);
-          const cx = 1250, cy = chipTop + 4 + (span - ch) / 2;
+          // in the right-hand recess: centred on it, 28 clear of its inner contour,
+          // right of the SIN / EXPIRES columns and above DISTRICT in both layouts
+          const cw = 160, ch = 160;
+          const cx = 1295, cy = 445;
           gfx.poly(ctx, [[cx + 14, cy], [cx + cw, cy], [cx + cw, cy + ch - 14], [cx + cw - 14, cy + ch], [cx, cy + ch], [cx, cy + 14]]);
           ctx.fillStyle = st.accent;
           ctx.fill();
@@ -263,14 +276,14 @@
           const sx = norm(doc.sex)[0] || '<';
           const l1 = clean('ID<' + clean(doc.number, 13) + clean(doc.dob, 10) + sx + clean(doc.expires, 10), 36);
           const l2 = clean(norm(doc.name2) + '<<' + norm(doc.name1), 36);
-          ctx.fillRect(130, 818, 1330, 4);
+          ctx.fillRect(150, 818, 1300, 4);
           ctx.font = `400 38px ${SINFORGE.const.FONT}`;
           ctx.fillStyle = ink;
           ctx.textBaseline = 'alphabetic';
           ctx.textAlign = 'center';
-          const step = 1330 / 36;
+          const step = 1300 / 36;
           [l1, l2].forEach((line, r) => {
-            for (let i = 0; i < 36; i++) ctx.fillText(line[i], 130 + step * (i + 0.5), 864 + r * 42);
+            for (let i = 0; i < 36; i++) ctx.fillText(line[i], 150 + step * (i + 0.5), 864 + r * 42);
           });
           ctx.textAlign = 'left';
         }
