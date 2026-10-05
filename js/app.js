@@ -423,7 +423,10 @@
       b.dataset.scheme = name;
       b.title = name.toUpperCase();
       b.setAttribute('aria-label', name);
-      b.style.background = `linear-gradient(90deg, ${sc.card} 0 50%, ${sc.ink} 50% 80%, ${sc.accent} 80%)`;
+      const sw = document.createElement('span');
+      sw.className = 'scheme-swatch';
+      sw.style.background = `linear-gradient(90deg, ${sc.card} 0 50%, ${sc.ink} 50% 80%, ${sc.accent} 80%)`;
+      b.appendChild(sw);
       b.addEventListener('click', () => {
         Object.assign(S.style, sc);
         persist.style();
