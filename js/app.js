@@ -142,25 +142,45 @@
   }
 
   // ---- left panel: blank picker + text slots built from the blank ----
+  // each blank is an icon of its own silhouette (outline + photo window),
+  // drawn from its polygons in native pixel space; the name is the tooltip
+  function blankIcon(B) {
+    const pts = (poly) => poly.map((p) => p.join(',')).join(' ');
+    const pad = Math.max(B.w, B.h) * 0.02;
+    return `<svg viewBox="${-pad} ${-pad} ${B.w + 2 * pad} ${B.h + 2 * pad}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`
+      + `<polygon class="bi-card" points="${pts(B.outline)}"/>`
+      + `<polygon class="bi-photo" points="${pts(B.photo.poly)}"/></svg>`;
+  }
   function buildBlankSelect() {
-    const sel = $('blankSel');
-    sel.innerHTML = '';
+    const box = $('blankPick');
+    box.innerHTML = '';
     SINFORGE.blankOrder.forEach((key) => {
-      const o = document.createElement('option');
       const k = 'bl_' + key.replace(/-/g, '_');
-      o.value = key;
-      o.textContent = t(k);
-      o.setAttribute('data-i18n', k);
-      sel.appendChild(o);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt';
+      btn.dataset.blank = key;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('data-i18n-title', k);
+      btn.title = t(k);
+      btn.innerHTML = blankIcon(SINFORGE.blanks[key]);
+      btn.onclick = () => {
+        if (S.blank === key) return;
+        S.blank = key;
+        SINFORGE.save('sinforge:blank', S.blank);
+        syncBlankPick();
+        buildTextFields();
+        syncControls();
+        requestRender();
+      };
+      box.appendChild(btn);
     });
-    sel.value = S.blank;
-    sel.onchange = () => {
-      S.blank = sel.value;
-      SINFORGE.save('sinforge:blank', S.blank);
-      buildTextFields();
-      syncControls();
-      requestRender();
-    };
+    syncBlankPick();
+  }
+  function syncBlankPick() {
+    $('blankPick').querySelectorAll('.blank-opt').forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.blank === S.blank));
+    });
   }
   const DIE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
     + '<rect x="3.5" y="3.5" width="17" height="17" rx="2"/>'
@@ -237,6 +257,7 @@
       setSlot(N.first, r.first);
       setSlot(N.last, r.last);
       if (N.title) setSlot(N.title, r.gender === 'f' ? 'MS' : 'MR');
+      if (N.sex) setSlot(N.sex, r.gender === 'f' ? 'F' : 'M');
       persist.doc();
       requestRender();
       if (r.fallback) setStatus(t(r.fallback === 'key' ? 'st_namekey' : 'st_namenet'), 'warn');
@@ -388,7 +409,7 @@
     });
     // per-blank decorations: hide toggles the active blank doesn't use
     const decor = blank().decor || [];
-    ['stripes', 'slashes', 'barcode', 'edge'].forEach((k) => {
+    ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'mrz'].forEach((k) => {
       const sw = document.querySelector(`.side-switch[data-style="${k}"]`);
       if (sw) sw.closest('.fx-toggle').hidden = !decor.includes(k);
     });
@@ -487,8 +508,12 @@
 
   // ---- stage: drag the photo to pan, wheel to zoom ----
   function docPoint(e) {
+    // the element box can be letterboxed (object-fit: contain + min-height),
+    // so map through the drawn image's rect, not the element's
     const cv = $('docCanvas'), r = cv.getBoundingClientRect(), B = blank();
-    return { x: ((e.clientX - r.left) / r.width) * B.w, y: ((e.clientY - r.top) / r.height) * B.h, r };
+    const f = Math.min(r.width / B.w, r.height / B.h);
+    const ox = r.left + (r.width - B.w * f) / 2, oy = r.top + (r.height - B.h * f) / 2;
+    return { x: (e.clientX - ox) / f, y: (e.clientY - oy) / f, r };
   }
   function inPhoto(p) {
     const b = blank().photo.box;

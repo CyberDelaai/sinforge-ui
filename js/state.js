@@ -32,6 +32,13 @@ SINFORGE.newDoc = () => ({
   name1: 'CYBER',
   name2: 'DOGGO',
   footer: 'ACCESS // ALL AREAS',
+  // citizen ID
+  issuer: 'CITIZEN ID // SECTOR 7',
+  sex: 'M',
+  dob: '2051-03-04',
+  expires: '2084-12-31',
+  district: 'NORTH HARBOR // BLOCK 12',
+  status: 'CLASS C // CITIZEN',
 });
 
 // Default look: colours, decorations, photo + card effects.
@@ -42,6 +49,8 @@ SINFORGE.newStyle = () => ({
   slashes: true,   // slanted bars after the badge number
   barcode: true,   // barcode in the bottom-right corner (encodes the number)
   edge: true,      // ink line along the outer edge
+  chip: true,      // contact chip (citizen ID)
+  mrz: true,       // machine-readable zone along the bottom (citizen ID)
   // photo effect: 'none' | 'mono' (threshold) | 'halftone' | 'dither'
   photoFx: 'halftone',
   photoLevel: 50,  // threshold / brightness bias, 0..100

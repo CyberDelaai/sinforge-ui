@@ -12,14 +12,19 @@ client-side; your images are never uploaded.
 
 ## Features
 
-- **Blanks** — pick a pre-defined document; everything else is filled in on top
-  of it. First blank: **EVENT BADGE** (1200×1600 vertical con badge).
-- **Text** — badge number, vertical role tag, title, two-line name, footer line.
+- **Blanks** — pick a pre-defined document from icons showing each one's
+  shape (silhouette + photo window); everything else is filled in on top
+  of it. **EVENT BADGE** (1200×1600 vertical con badge) and **CITIZEN ID**
+  (1600×1010 horizontal ID card, CR80 proportions: issuer band, photo, labelled
+  data fields, contact chip, machine-readable zone built from the fields).
+- **Text** — event badge: badge number, vertical role tag, title, two-line
+  name, footer line. Citizen ID: issuer, SIN number, given names, surname, sex,
+  date of birth, expiry (both with a random-date die), district, status.
   Long text shrinks to fit its slot. The die button next to the badge number
   generates a random serial in one of 5 formats (`#92-0329`, `SIN-2950-0982`,
   `NZ-4085-Z`, `C4:16:F4:79`, `NMS/22137`).
 - **Name generator** — GENERATE NAME fills both name lines and sets the title
-  to MR / MS to match the gender. The cog beside it opens its settings: gender, region
+  to MR / MS (event badge) or the sex to M / F (citizen ID) to match the gender. The cog beside it opens its settings: gender, region
   (anglo, French, German, Spanish, Italian, Nordic, Dutch, Slavic, Turkish,
   Arabic, Indian, Japanese, Chinese, Korean, Brazilian, fantasy, mythic) and an
   optional [Behind the Name](https://www.behindthename.com/api/) API key.

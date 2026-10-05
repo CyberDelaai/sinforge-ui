@@ -23,8 +23,14 @@
   const POOLS = { 9: '0123456789', '@': 'ABCDEFGHJKLMNPQRSTUVWXYZ', '%': '0123456789ABCDEF' };
   const pick = (str) => str[Math.floor(Math.random() * str.length)];
   SINFORGE.serialPatterns = SERIAL_PATTERNS;
+  // A random YYYY-MM-DD between two years (inclusive); days stop at 28 so every month works.
+  const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const date = (y0, y1) => `${rint(y0, y1)}-${pad2(rint(1, 12))}-${pad2(rint(1, 28))}`;
   SINFORGE.gen = {
     serial: () => pick(SERIAL_PATTERNS).replace(/[9@%]/g, (c) => pick(POOLS[c])),
+    dob: () => date(2020, 2060),
+    expiry: () => date(2077, 2092),
   };
 
   const EVENT_OUTLINE = [
@@ -34,6 +40,23 @@
     [100, 930], [140, 890], [140, 430], [100, 390],
   ];
   const EVENT_PHOTO = [[250, 250], [740, 250], [850, 360], [850, 1090], [360, 1090], [250, 980]];
+
+  const ID_OUTLINE = [
+    [60, 140], [130, 70], [980, 70], [1005, 45], [1295, 45], [1320, 70], [1470, 70], [1540, 140],
+    [1540, 400], [1505, 435], [1505, 615], [1540, 650],
+    // bottom edge: one straight line, corner to corner — the reference edge the MRZ reads along
+    [1540, 940], [60, 940],
+    [60, 690], [95, 655], [95, 385], [60, 350],
+  ];
+  // The citizen ID's content ends at y = 800 above the machine-readable zone, or
+  // runs on to 878 (40 above the inner contour, as the photo sits 40 below the
+  // issuer band) when the MRZ is off — the photo window grows to match.
+  const ID_BOTTOM = { mrz: 800, full: 878 };
+  const idPhoto = (b) => ({
+    poly: [[130, 220], [510, 220], [570, 280], [570, b], [190, b], [130, b - 60]],
+    box: { x: 130, y: 220, w: 440, h: b - 220 },
+  });
+  const ID_PHOTO = { mrz: idPhoto(ID_BOTTOM.mrz), full: idPhoto(ID_BOTTOM.full) };
 
   const blanks = {
     'event-badge': {
@@ -80,7 +103,7 @@
         }
 
         // photo, clipped to its window, then the window's frame
-        const box = this.photo.box;
+        const { poly, box } = this.photo;
         const pic = gfx.photo(box, k);
         if (pic) {
           ctx.save();
@@ -131,8 +154,157 @@
         if (st.barcode) gfx.barcode(ctx, 860, 1336, 160, 104, doc.number, ink);
       },
     },
+
+    // Horizontal citizen ID (CR80 proportions): issuer band on top, photo on
+    // the left, labelled data fields on the right, machine-readable zone below.
+    'citizen-id': {
+      w: 1600, h: 1010,
+      outline: ID_OUTLINE,
+      // a getter: the window depends on the MRZ toggle (render, framing drag and
+      // the watermark hole all read it through here)
+      get photo() { return SINFORGE.state.style.mrz ? ID_PHOTO.mrz : ID_PHOTO.full; },
+      texts: [
+        { id: 'issuer', label: 'f_issuer', max: 32 },
+        { id: 'number', label: 'f_sin', max: 16, gen: 'serial' },
+        { id: 'name1', label: 'f_given', max: 24 },
+        { id: 'name2', label: 'f_surname', max: 18 },
+        { id: 'sex', label: 'f_sex', max: 3 },
+        { id: 'dob', label: 'f_dob', max: 10, gen: 'dob' },
+        { id: 'expires', label: 'f_expires', max: 10, gen: 'expiry' },
+        { id: 'district', label: 'f_district', max: 28 },
+        { id: 'status', label: 'f_status', max: 24 },
+      ],
+      names: { first: 'name1', last: 'name2', sex: 'sex' },
+      decor: ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'mrz'],
+
+      draw(ctx, k, { gfx, st, doc }) {
+        const ink = st.ink;
+        // a small field caption over its value (captions are part of the printed
+        // document, so they stay in English like the MRZ)
+        // Laid out from the caption's cap top: caption, a tight CAP_GAP, then the
+        // value's cap top — so each caption hugs its own value. The leftover
+        // height is shared out evenly as the gap between rows (≈40 with the MRZ,
+        // wider without it), so a row never reads as captioning the line above.
+        const CAP = 22, CAP_GAP = 12, BIG = 76, VAL = 50, STATUS = 58, ROWS = 5;
+        const bottom = st.mrz ? ID_BOTTOM.mrz : ID_BOTTOM.full;
+        const capA = gfx.ascent(ctx, 'H', 400, CAP);
+        const rowH = (size) => capA + CAP_GAP + gfx.ascent(ctx, 'H', 700, size);
+        const statusTop = bottom - gfx.ascent(ctx, 'H', 700, STATUS);
+        const ROW_GAP = (statusTop - 222 - rowH(BIG) - (ROWS - 1) * rowH(VAL)) / ROWS;
+        const field = (cap, val, x, top, maxW, size) => {
+          size = size || VAL;
+          const capBase = top + capA;
+          const valBase = top + rowH(size);
+          gfx.text(ctx, cap, x, capBase, { size: CAP, maxW, color: ink, weight: 400, spacing: 0.14 });
+          gfx.text(ctx, val, x, valBase, { size, maxW, color: ink });
+          return valBase + ROW_GAP; // the next row's top
+        };
+
+        // outer edge line + inner contour
+        if (st.edge) {
+          gfx.poly(ctx, ID_OUTLINE);
+          ctx.strokeStyle = ink; ctx.lineWidth = 10; ctx.lineJoin = 'miter';
+          ctx.stroke();
+        }
+        gfx.poly(ctx, gfx.inset(ID_OUTLINE, 22));
+        ctx.strokeStyle = ink; ctx.lineWidth = 5; ctx.lineJoin = 'miter';
+        ctx.stroke();
+
+        // issuer band: solid ink, the issuer in the card colour, slashes trailing it
+        gfx.poly(ctx, [[150, 100], [1470, 100], [1470, 146], [1436, 180], [150, 180]]);
+        ctx.fillStyle = ink;
+        ctx.fill();
+        const issW = gfx.text(ctx, doc.issuer, 180, 158, { size: 50, maxW: 1000, color: st.card, spacing: 0.04 });
+        if (st.slashes) {
+          ctx.fillStyle = st.card;
+          let x = 180 + issW + 30;
+          for (let i = 0; i < 3 && x < 1330; i++, x += 26) gfx.slant(ctx, x, 120, 160, 13, 20);
+          if (x < 1360) gfx.slant(ctx, x + 6, 120, 160, 1400 - x - 6, 20);
+        }
+
+        // hazard stripes beside the photo and in the right-hand recess
+        if (st.stripes) {
+          gfx.stripes(ctx, 596, 624, 230, bottom - 8, ink, false);
+          gfx.stripes(ctx, 1440, 1468, 446, 606, ink, true);
+        }
+
+        // photo, clipped to its window, then the window's frame
+        const { poly, box } = this.photo;
+        const pic = gfx.photo(box, k);
+        if (pic) {
+          ctx.save();
+          gfx.poly(ctx, poly);
+          ctx.clip();
+          ctx.drawImage(pic, box.x, box.y, box.w, box.h);
+          ctx.restore();
+        }
+        gfx.poly(ctx, poly);
+        ctx.strokeStyle = ink; ctx.lineWidth = 14; ctx.lineJoin = 'miter';
+        ctx.stroke();
+        ctx.fillStyle = ink;
+        ctx.fillRect(250, 210, 180, 22);  // thick run on the top edge
+        ctx.fillRect(560, (220 + bottom) / 2 - 70, 22, 140);  // and mid-way down the right edge
+
+        // data fields
+        const X = 660;
+        let y = 222; // level with the photo window's top
+        y = field('SURNAME', doc.name2, X, y, 760, BIG);
+        y = field('GIVEN NAMES', doc.name1, X, y, 760);
+        field('SEX', doc.sex, 1180, y, 150);
+        y = field('SIN NO.', doc.number, X, y, 470);
+        const chipTop = y;
+        field('EXPIRES', doc.expires, 950, y, 270);
+        y = field('DATE OF BIRTH', doc.dob, X, y, 270);
+        y = field('DISTRICT', doc.district, X, y, st.chip ? 560 : 760);
+
+        // contact chip in the accent colour
+        if (st.chip) {
+          // centred on the DOB → DISTRICT rows, no taller than a real chip's proportions
+          const span = y - ROW_GAP - chipTop - 4, cw = 160, ch = Math.min(span, 160);
+          const cx = 1250, cy = chipTop + 4 + (span - ch) / 2;
+          gfx.poly(ctx, [[cx + 14, cy], [cx + cw, cy], [cx + cw, cy + ch - 14], [cx + cw - 14, cy + ch], [cx, cy + ch], [cx, cy + 14]]);
+          ctx.fillStyle = st.accent;
+          ctx.fill();
+          ctx.strokeStyle = ink; ctx.lineWidth = 4;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cx, cy + ch / 3); ctx.lineTo(cx + 52, cy + ch / 3);
+          ctx.moveTo(cx, cy + 2 * ch / 3); ctx.lineTo(cx + 52, cy + 2 * ch / 3);
+          ctx.moveTo(cx + cw, cy + ch / 3); ctx.lineTo(cx + cw - 52, cy + ch / 3);
+          ctx.moveTo(cx + cw, cy + 2 * ch / 3); ctx.lineTo(cx + cw - 52, cy + 2 * ch / 3);
+          ctx.moveTo(cx + cw / 2, cy); ctx.lineTo(cx + cw / 2, cy + 30);
+          ctx.moveTo(cx + cw / 2, cy + ch); ctx.lineTo(cx + cw / 2, cy + ch - 30);
+          ctx.rect(cx + 52, cy + 30, cw - 104, ch - 60);
+          ctx.stroke();
+        }
+
+        // status line in the accent colour, barcode beside it
+        // (baseline level with the photo window's bottom)
+        gfx.text(ctx, doc.status, X, bottom, { size: STATUS, maxW: st.barcode ? 490 : 760, color: st.accent });
+        if (st.barcode) gfx.barcode(ctx, 1180, statusTop, 240, bottom - statusTop, doc.number, ink);
+
+        // machine-readable zone: two fixed-pitch lines built from the fields
+        if (st.mrz) {
+          const norm = (s) => String(s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '<');
+          const clean = (s, n) => norm(s).padEnd(n, '<').slice(0, n);
+          const sx = norm(doc.sex)[0] || '<';
+          const l1 = clean('ID<' + clean(doc.number, 13) + clean(doc.dob, 10) + sx + clean(doc.expires, 10), 36);
+          const l2 = clean(norm(doc.name2) + '<<' + norm(doc.name1), 36);
+          ctx.fillRect(130, 818, 1330, 4);
+          ctx.font = `400 38px ${SINFORGE.const.FONT}`;
+          ctx.fillStyle = ink;
+          ctx.textBaseline = 'alphabetic';
+          ctx.textAlign = 'center';
+          const step = 1330 / 36;
+          [l1, l2].forEach((line, r) => {
+            for (let i = 0; i < 36; i++) ctx.fillText(line[i], 130 + step * (i + 0.5), 864 + r * 42);
+          });
+          ctx.textAlign = 'left';
+        }
+      },
+    },
   };
 
   SINFORGE.blanks = blanks;
-  SINFORGE.blankOrder = ['event-badge'];
+  SINFORGE.blankOrder = ['event-badge', 'citizen-id'];
 })(window.SINFORGE);

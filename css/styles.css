@@ -279,6 +279,22 @@
   .btn-icon.active { background: color-mix(in srgb, var(--btn-color) 22%, transparent); }
   .gen-config { margin-top: 4px; padding: 0 0 4px 10px; border-left: 2px solid rgba(var(--main-rgb),0.35); }
   .gen-config[hidden] { display: none; }
+  /* blank picker: one icon per blank, drawn from its outline + photo window */
+  .blank-pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .blank-opt {
+    width: 56px; height: 64px; padding: 6px; line-height: 0; cursor: pointer;
+    background: var(--panel); color: rgba(var(--main-rgb),0.55);
+    border: 1px solid rgba(var(--main-rgb),0.3);
+    transition: border-color .12s, box-shadow .12s, color .12s;
+  }
+  .blank-opt svg { width: 100%; height: 100%; }
+  .blank-opt .bi-card { fill: color-mix(in srgb, currentColor 14%, transparent); stroke: currentColor; stroke-width: 2.5px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; }
+  .blank-opt .bi-photo { fill: none; stroke: currentColor; stroke-width: 1.5px; vector-effect: non-scaling-stroke; opacity: .7; }
+  .blank-opt:hover { color: var(--main); border-color: rgba(var(--main-rgb),0.8); }
+  .blank-opt:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  .blank-opt[aria-checked="true"] {
+    color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.45);
+  }
 
   /* range sliders — cyan thumb on a dim track (ported from eidolon / gridmap-ui POTENCY) */
   .potency-slider {
