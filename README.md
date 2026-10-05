@@ -57,6 +57,9 @@ client-side; your images are never uploaded.
   style: a real Code 128 of the number, EAN-13 (retail look: long guard
   bars, digits in groups), postal 4-state, stacked (PDF417-look), matrix
   (QR-look) or dot code. The 2D codes get a square slot.
+- **Date format** — dates are entered as YYYY-MM-DD; click a date on the
+  card to pick how they print: 2077-10-31, 31.10.2077, 10/31/2077,
+  31 OCT 2077, 31OCT77 or 20771031.
 - **Effects** — opened from the first icon at the stage's top-left corner: neon glow around the card, print grain, scanlines.
 - **Export** — PNG at 1× (1200×1600) or 2× (2400×3200), transparent outside
   the card shape.

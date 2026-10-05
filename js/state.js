@@ -48,6 +48,8 @@ SINFORGE.newStyle = () => ({
   frame: 'notch',
   // barcode type: key into SINFORGE.codes (js/codes.js)
   code: 'code128',
+  // date format the date slots print in: key into SINFORGE.dateFormats (js/dates.js)
+  dateFmt: 'iso',
   // decorations (on/off)
   stripes: true,   // hazard stripe columns along the side recesses
   slashes: true,   // slanted bars after the badge number

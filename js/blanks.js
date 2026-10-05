@@ -9,7 +9,9 @@
   //             frame (js/frames.js)
   //   photo     getter: SINFORGE.frameWindow(this.portrait) — { box, poly, ... }
   //   texts     text slots, in panel order: { id (key in S.doc), label (i18n key), max,
-  //             gen? (key in SINFORGE.gen — adds a GENERATE button beside the field) }
+  //             gen? (key in SINFORGE.gen — adds a GENERATE button beside the field),
+  //             date? (a YYYY-MM-DD slot: draw it with gfx.date so it prints in
+  //             the selected date format) }
   //   names     optional { first, last, title? }: slot ids the name generator
   //             fills — adds a GENERATE NAME row (+ its settings) after `last`
   //   decor     which decoration toggles apply (keys in S.style)
@@ -158,8 +160,8 @@
         { id: 'name1', label: 'f_given', max: 24 },
         { id: 'name2', label: 'f_surname', max: 18 },
         { id: 'sex', label: 'f_sex', max: 3 },
-        { id: 'dob', label: 'f_dob', max: 10, gen: 'dob' },
-        { id: 'expires', label: 'f_expires', max: 10, gen: 'expiry' },
+        { id: 'dob', label: 'f_dob', max: 10, gen: 'dob', date: true },
+        { id: 'expires', label: 'f_expires', max: 10, gen: 'expiry', date: true },
         { id: 'district', label: 'f_district', max: 28 },
         { id: 'status', label: 'f_status', max: 24 },
       ],
@@ -180,12 +182,13 @@
         const rowH = (size) => capA + CAP_GAP + gfx.ascent(ctx, 'H', 700, size);
         const statusTop = bottom - gfx.ascent(ctx, 'H', 700, STATUS);
         const ROW_GAP = (statusTop - 222 - rowH(BIG) - (ROWS - 1) * rowH(VAL)) / ROWS;
-        const field = (cap, val, x, top, maxW, size) => {
+        // (isDate: the value prints in the selected date format — gfx.date)
+        const field = (cap, val, x, top, maxW, size, isDate) => {
           size = size || VAL;
           const capBase = top + capA;
           const valBase = top + rowH(size);
           gfx.text(ctx, cap, x, capBase, { size: CAP, maxW, color: ink, weight: 400, spacing: 0.14 });
-          gfx.text(ctx, val, x, valBase, { size, maxW, color: ink });
+          (isDate ? gfx.date : gfx.text)(ctx, val, x, valBase, { size, maxW, color: ink }, st);
           return valBase + ROW_GAP; // the next row's top
         };
         // A 2D barcode gets a square slot in the bottom-right corner, spanning
@@ -247,8 +250,8 @@
         y = field('GIVEN NAMES', doc.name1, X, y, topW);
         field('SEX', doc.sex, 1180, y, 150);
         y = field('SIN NO.', doc.number, X, y, 470);
-        field('EXPIRES', doc.expires, 950, y, 270);
-        y = field('DATE OF BIRTH', doc.dob, X, y, 270);
+        field('EXPIRES', doc.expires, 950, y, 270, VAL, true);
+        y = field('DATE OF BIRTH', doc.dob, X, y, 270, VAL, true);
         y = field('DISTRICT', doc.district, X, y, sq ? besideSq : longStripes ? 740 : 760);
 
         // contact chip in the accent colour

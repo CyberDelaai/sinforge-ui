@@ -401,6 +401,12 @@
   }
   .frame-pop[hidden] { display: none; }
   .frame-pop .blank-pick { flex-wrap: nowrap; }
+  /* date format picker: the blank picker's tiles, as text rows showing a sample date */
+  .date-pick { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; }
+  .blank-opt.date-opt {
+    width: auto; height: auto; padding: 7px 12px; line-height: 1.2;
+    font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 1px;
+  }
   .doc-canvas.dragging { cursor: grabbing; }
 
   /* EFFECTS / WATERMARK / PHOTO FX windows (EIDOLON's stage-tool + .adj-pop): the

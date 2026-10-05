@@ -1,4 +1,4 @@
-<!-- SINFORGE v0.5.0 -->
+<!-- SINFORGE v0.6.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,7 +77,7 @@
         <a class="app-menu-item current" href="https://cyberdeck.tools/sinforge-ui/" aria-current="page">&gt; SINFORGE_</a>
       </nav>
     </div>
-    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.5.0</span></span></div>
+    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.6.0</span></span></div>
     <select class="lang-select" id="uiLangSel" aria-label="interface language"><option value="en">EN</option><option value="ru">RU</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="it">IT</option><option value="ja">JP</option><option value="zh">CN</option></select>
   </header>
 
@@ -137,6 +137,14 @@
             <button class="adj-close" type="button" aria-label="close">&times;</button>
           </div>
           <div class="blank-pick" id="codePick" role="radiogroup" aria-labelledby="codeTitle"></div>
+        </div>
+        <!-- date format picker: opens on a click on a date, beside the click -->
+        <div class="frame-pop config" id="datePop" role="dialog" aria-labelledby="dateTitle" data-augmented-ui="tl-clip br-clip border" hidden>
+          <div class="modal-head">
+            <h2 id="dateTitle">// <span data-i18n="l_datefmt">DATE FORMAT</span></h2>
+            <button class="adj-close" type="button" aria-label="close">&times;</button>
+          </div>
+          <div class="date-pick" id="datePick" role="radiogroup" aria-labelledby="dateTitle"></div>
         </div>
         <div class="adj-pop config" id="fxPop" role="dialog" aria-labelledby="fxTitle" data-augmented-ui="tl-clip br-clip border" hidden>
           <div class="modal-head">
@@ -253,6 +261,7 @@
 <script defer src="js/render.js"></script>
 <script defer src="js/frames.js"></script>
 <script defer src="js/codes.js"></script>
+<script defer src="js/dates.js"></script>
 <script defer src="js/blanks.js"></script>
 <script defer src="js/names.js"></script>
 <script defer src="js/app.js"></script>

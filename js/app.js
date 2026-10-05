@@ -258,6 +258,29 @@
     });
   }
 
+  // ---- date format picker: one option per format, showing a sample date in
+  // it (a fixed date, so the options never change) ----
+  function buildDatePick() {
+    const box = $('datePick');
+    box.innerHTML = '';
+    SINFORGE.dateOrder.forEach((key) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt date-opt';
+      btn.dataset.date = key;
+      btn.setAttribute('role', 'radio');
+      btn.textContent = SINFORGE.dateFormats[key]({ y: 2077, m: 10, d: 31 });
+      btn.onclick = () => {
+        if (S.style.dateFmt === key) return;
+        S.style.dateFmt = key;
+        persist.style();
+        syncControls();
+        requestRender();
+      };
+      box.appendChild(btn);
+    });
+  }
+
   // Icons follow the geometry: frame icons the active blank's photo box, blank
   // icons the selected frame — redrawn only when one of those changed.
   let iconSig = '';
@@ -275,6 +298,10 @@
     const code = SINFORGE.codes[S.style.code] ? S.style.code : 'code128';
     $('codePick').querySelectorAll('.blank-opt').forEach((btn) => {
       btn.setAttribute('aria-checked', String(btn.dataset.code === code));
+    });
+    const fmt = SINFORGE.dateFormats[S.style.dateFmt] ? S.style.dateFmt : 'iso';
+    $('datePick').querySelectorAll('.date-opt').forEach((btn) => {
+      btn.setAttribute('aria-checked', String(btn.dataset.date === fmt));
     });
   }
   const DIE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
@@ -298,6 +325,7 @@
       inp.maxLength = slot.max;
       inp.spellcheck = false;
       inp.value = S.doc[slot.id] || '';
+      if (slot.date) inp.placeholder = 'YYYY-MM-DD';
       inp.addEventListener('input', () => {
         S.doc[slot.id] = inp.value;
         persist.doc();
@@ -606,7 +634,8 @@
   }
 
   // ---- stage: click the photo for the frame picker (drag it to pan, wheel to
-  // zoom), click the barcode for the barcode picker ----
+  // zoom), click the barcode for the barcode picker, a date for the date
+  // format picker ----
   // The canvas as drawn: the element box can be letterboxed (object-fit:
   // contain + min-height), so map through the drawn image's rect, not the element's.
   function drawnRect() {
@@ -620,17 +649,25 @@
   }
   const inBox = (p, b) => !!b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
   function inPhoto(p) { return inBox(p, blank().photo.box); }
+  // the date under a point (as last rendered — gfx.dateBoxes, padded a little
+  // so the short values are easy to hit), or undefined
+  const DATE_PAD = 10;
+  const dateAt = (p) => SINFORGE.gfx.dateBoxes.find((b) => inBox(p, {
+    x: b.x - DATE_PAD, y: b.y - DATE_PAD, w: b.w + 2 * DATE_PAD, h: b.h + 2 * DATE_PAD,
+  }));
   // what a point on the canvas hits: 'photo', 'code' (the barcode as last
-  // rendered — gfx.codeBox) or null
+  // rendered — gfx.codeBox), 'date' or null
   function hitAt(p) {
     if (inPhoto(p)) return 'photo';
-    return inBox(p, SINFORGE.gfx.codeBox) ? 'code' : null;
+    if (inBox(p, SINFORGE.gfx.codeBox)) return 'code';
+    return dateAt(p) ? 'date' : null;
   }
   // each click target's picker
-  const STAGE_POPS = { photo: 'framePop', code: 'codePop' };
-  const HINTS = { photo: 'hint_frame', code: 'hint_code' };
-  // hover marker: the photo window's outline (or the barcode's box) laid over the canvas
-  function showHover(hit) {
+  const STAGE_POPS = { photo: 'framePop', code: 'codePop', date: 'datePop' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code', date: 'hint_date' };
+  // hover marker: the photo window's outline (or the barcode's / the hovered
+  // date's box) laid over the canvas
+  function showHover(hit, p) {
     const svg = $('photoHover');
     $('docCanvas').classList.toggle('over-photo', !!hit);
     $('docCanvas').title = hit ? t(HINTS[hit]) : '';
@@ -642,7 +679,7 @@
       left: d.left - s.left + 'px', top: d.top - s.top + 'px',
       width: B.w * d.f + 'px', height: B.h * d.f + 'px',
     });
-    const c = SINFORGE.gfx.codeBox, pad = 8;
+    const c = hit === 'date' ? dateAt(p) : SINFORGE.gfx.codeBox, pad = hit === 'date' ? DATE_PAD : 8;
     const poly = hit === 'photo' ? B.photo.poly
       : [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
     svg.firstElementChild.setAttribute('points', poly.map((p) => p.join(',')).join(' '));
@@ -672,7 +709,7 @@
     });
     cv.addEventListener('pointermove', (e) => {
       const p = docPoint(e);
-      if (!drag) { showHover(hitAt(p)); return; }
+      if (!drag) { showHover(hitAt(p), p); return; }
       if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 5) return;
       if (drag.hit !== 'photo' || !S.photo) return;
       if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(null); }
@@ -795,6 +832,7 @@
     buildBlankSelect();
     buildFramePick();
     buildCodePick();
+    buildDatePick();
     buildTextFields();
     buildSchemes();
     bindControls();

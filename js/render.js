@@ -96,6 +96,20 @@
     return w;
   };
 
+  // A date slot (YYYY-MM-DD) drawn like gfx.text in the selected format
+  // (js/dates.js). The value's box is added to gfx.dateBoxes (native px) for the
+  // stage's click target. Returns the drawn width.
+  gfx.date = function date(ctx, str, x, y, o, st) {
+    const s = SINFORGE.fmtDate(str, st.dateFmt);
+    const w = gfx.text(ctx, s, x, y, o);
+    if (w) {
+      const a = ctx.measureText(s).actualBoundingBoxAscent;
+      gfx.dateBoxes.push({ x, y: y - a, w, h: a });
+    }
+    return w;
+  };
+  gfx.dateBoxes = [];
+
   // A parallelogram leaning right: bottom edge from x to x + w at yb, top
   // edge shifted by `lean` at yt.
   gfx.slant = function slant(ctx, x, yt, yb, w, lean) {
@@ -427,6 +441,7 @@
 
     drawWatermark(ctx, B, st);
     gfx.codeBox = null; // set again by gfx.code if the blank draws a barcode
+    gfx.dateBoxes = []; // filled by gfx.date
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });
 
     if (st.grain) {
