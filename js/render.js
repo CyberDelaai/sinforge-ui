@@ -186,8 +186,23 @@
     const { L, A } = lumaOf(img.data, st);
 
     if (st.photoFx === 'mono') {
+      // Threshold at 128, clamped to the photo's 2nd–98th luminance percentile
+      // so extreme LEVELs keep the darkest/lightest detail instead of printing
+      // an empty or solid window.
+      // (L spans -150..405 once the LEVEL bias is in, so bin with an offset.)
+      const OFF = 150, BINS = 256 + 2 * OFF, hist = new Uint32Array(BINS);
+      let total = 0;
+      for (let i = 0; i < L.length; i++) {
+        if (A[i] > 127) { hist[Math.min(BINS - 1, Math.max(0, Math.floor(L[i]) + OFF))]++; total++; }
+      }
+      const pct = (q) => {
+        let acc = 0;
+        for (let v = 0; v < BINS; v++) { acc += hist[v]; if (acc >= total * q) return v - OFF; }
+        return BINS - 1 - OFF;
+      };
+      const t = Math.min(Math.max(128, pct(0.02) + 1), pct(0.98));
       const on = new Uint8Array(L.length);
-      for (let i = 0; i < L.length; i++) on[i] = A[i] > 127 && L[i] < 128 ? 1 : 0;
+      for (let i = 0; i < L.length; i++) on[i] = A[i] > 127 && L[i] < t ? 1 : 0;
       x.putImageData(binaryOut(w, h, on, st.ink), 0, 0);
       return c;
     }
