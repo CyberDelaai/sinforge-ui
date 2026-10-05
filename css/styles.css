@@ -299,6 +299,10 @@
   .blank-opt .bi-frame { fill: color-mix(in srgb, currentColor 14%, transparent); stroke: currentColor; stroke-linejoin: miter; }
   .blank-opt .bi-mark { fill: currentColor; }
   .blank-opt .bi-accent { fill: currentColor; opacity: .5; }
+  /* chip picker: the accent plate, unfilled shapes and the ink outlines */
+  .blank-opt .bi-chip { fill: color-mix(in srgb, currentColor 30%, transparent); }
+  .blank-opt .bi-none { fill: none; }
+  .blank-opt .bi-line { stroke: currentColor; stroke-width: 1.5px; stroke-linejoin: miter; }
   .blank-opt:hover { color: var(--main); border-color: rgba(var(--main-rgb),0.8); }
   .blank-opt:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
   .blank-opt[aria-checked="true"] {

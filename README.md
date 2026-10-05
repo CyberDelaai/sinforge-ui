@@ -59,6 +59,9 @@ client-side; your images are never uploaded.
   style: a real Code 128 of the number, EAN-13 (retail look: long guard
   bars, digits in groups), postal 4-state, stacked (PDF417-look), matrix
   (QR-look) or dot code. The 2D codes get a square slot.
+- **Chip type** — click the chip (citizen ID; hovering outlines it) to pick
+  its style: ISO contact plate, EMV payment chip, processor package, RFID
+  coil, datajack port or hex node.
 - **Date format** — dates are entered as YYYY-MM-DD; click a date on the
   card to pick how they print: 2077-10-31, 31.10.2077, 10/31/2077,
   31 OCT 2077, 31OCT77 or 20771031.

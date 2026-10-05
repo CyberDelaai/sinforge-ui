@@ -264,27 +264,10 @@
         y = field('DATE OF BIRTH', doc.dob, X, y, 270, VAL, true);
         y = field('DISTRICT', doc.district, X, y, sq ? besideSq : longStripes ? 740 : 760);
 
-        // contact chip in the accent colour
-        if (st.chip) {
-          // in the right-hand recess: centred on it, 28 clear of its inner contour,
-          // right of the SIN / EXPIRES columns and above DISTRICT in both layouts
-          const cw = 160, ch = 160;
-          const cx = 1295, cy = 445;
-          gfx.poly(ctx, [[cx + 14, cy], [cx + cw, cy], [cx + cw, cy + ch - 14], [cx + cw - 14, cy + ch], [cx, cy + ch], [cx, cy + 14]]);
-          ctx.fillStyle = st.accent;
-          ctx.fill();
-          ctx.strokeStyle = ink; ctx.lineWidth = 4;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(cx, cy + ch / 3); ctx.lineTo(cx + 52, cy + ch / 3);
-          ctx.moveTo(cx, cy + 2 * ch / 3); ctx.lineTo(cx + 52, cy + 2 * ch / 3);
-          ctx.moveTo(cx + cw, cy + ch / 3); ctx.lineTo(cx + cw - 52, cy + ch / 3);
-          ctx.moveTo(cx + cw, cy + 2 * ch / 3); ctx.lineTo(cx + cw - 52, cy + 2 * ch / 3);
-          ctx.moveTo(cx + cw / 2, cy); ctx.lineTo(cx + cw / 2, cy + 30);
-          ctx.moveTo(cx + cw / 2, cy + ch); ctx.lineTo(cx + cw / 2, cy + ch - 30);
-          ctx.rect(cx + 52, cy + 30, cw - 104, ch - 60);
-          ctx.stroke();
-        }
+        // the chip (selected type, js/chips.js) in the accent colour, in the
+        // right-hand recess: centred on it, 28 clear of its inner contour, right
+        // of the SIN / EXPIRES columns and above DISTRICT in both layouts
+        if (st.chip) gfx.chip(ctx, { x: 1295, y: 445, w: 160, h: 160 }, st);
 
         // status line in the accent colour, barcode beside it (or the 2D code)
         // (baseline level with the photo window's bottom)

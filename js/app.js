@@ -258,6 +258,43 @@
     });
   }
 
+  // ---- chip picker: one icon per chip, drawn from the chip's own geometry;
+  // the name is the tooltip ----
+  function chipIcon(key) {
+    const f = (v) => +v.toFixed(2);
+    const pts = (a) => a.map((p) => p.map(f).join(',')).join(' ');
+    return '<svg viewBox="-4 -4 108 108" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
+      + SINFORGE.chips[key].shapes({ x: 0, y: 0, w: 100, h: 100 }).map((sh) => {
+        const cls = [sh.fill === 'accent' ? 'bi-chip' : sh.fill === 'ink' ? 'bi-mark' : 'bi-none',
+          sh.l || sh.stroke ? 'bi-line' : ''].join(' ');
+        if (sh.c) return `<circle class="${cls}" vector-effect="non-scaling-stroke" cx="${f(sh.c[0])}" cy="${f(sh.c[1])}" r="${f(sh.c[2])}"/>`;
+        return `<${sh.p ? 'polygon' : 'polyline'} class="${cls}" vector-effect="non-scaling-stroke" points="${pts(sh.p || sh.l)}"/>`;
+      }).join('') + '</svg>';
+  }
+  function buildChipPick() {
+    const box = $('chipPick');
+    box.innerHTML = '';
+    SINFORGE.chipOrder.forEach((key) => {
+      const k = 'ch_' + key;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt';
+      btn.dataset.chip = key;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('data-i18n-title', k);
+      btn.title = t(k);
+      btn.innerHTML = chipIcon(key);
+      btn.onclick = () => {
+        if (S.style.chipType === key) return;
+        S.style.chipType = key;
+        persist.style();
+        syncControls();
+        requestRender();
+      };
+      box.appendChild(btn);
+    });
+  }
+
   // ---- date format picker: one option per format, showing a sample date in
   // it (a fixed date, so the options never change) ----
   function buildDatePick() {
@@ -298,6 +335,10 @@
     const code = SINFORGE.codes[S.style.code] ? S.style.code : 'code128';
     $('codePick').querySelectorAll('.blank-opt').forEach((btn) => {
       btn.setAttribute('aria-checked', String(btn.dataset.code === code));
+    });
+    const chip = SINFORGE.chips[S.style.chipType] ? S.style.chipType : 'contact';
+    $('chipPick').querySelectorAll('.blank-opt').forEach((btn) => {
+      btn.setAttribute('aria-checked', String(btn.dataset.chip === chip));
     });
     const fmt = SINFORGE.dateFormats[S.style.dateFmt] ? S.style.dateFmt : 'iso';
     $('datePick').querySelectorAll('.date-opt').forEach((btn) => {
@@ -634,8 +675,8 @@
   }
 
   // ---- stage: click the photo for the frame picker (drag it to pan, wheel to
-  // zoom), click the barcode for the barcode picker, a date for the date
-  // format picker ----
+  // zoom), click the barcode for the barcode picker, the chip for the chip
+  // picker, a date for the date format picker ----
   // The canvas as drawn: the element box can be letterboxed (object-fit:
   // contain + min-height), so map through the drawn image's rect, not the element's.
   function drawnRect() {
@@ -656,19 +697,21 @@
     x: b.x - DATE_PAD, y: b.y - DATE_PAD, w: b.w + 2 * DATE_PAD, h: b.h + 2 * DATE_PAD,
   }));
   // what a point on the canvas hits: 'photo', 'code' (the barcode as last
-  // rendered — gfx.codeBox), 'dna' (gfx.dnaBox), 'date' or null
+  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'date' or null
   function hitAt(p) {
     if (inPhoto(p)) return 'photo';
     if (inBox(p, SINFORGE.gfx.codeBox)) return 'code';
+    if (inBox(p, SINFORGE.gfx.chipBox)) return 'chip';
     if (inBox(p, SINFORGE.gfx.dnaBox)) return 'dna';
     return dateAt(p) ? 'date' : null;
   }
   // each click target's picker (the DNA strip has none: a click flips it
   // between the helix and the letters)
-  const STAGE_POPS = { photo: 'framePop', code: 'codePop', date: 'datePop' };
-  const HINTS = { photo: 'hint_frame', code: 'hint_code', date: 'hint_date', dna: 'hint_dna' };
-  // hover marker: the photo window's outline (or the barcode's / the hovered
-  // date's box) laid over the canvas
+  const STAGE_POPS = { photo: 'framePop', code: 'codePop', chip: 'chipPop', date: 'datePop' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna' };
+  const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox' };
+  // hover marker: the photo window's outline (or the barcode's / chip's /
+  // the hovered date's box) laid over the canvas
   function showHover(hit, p) {
     const svg = $('photoHover');
     $('docCanvas').classList.toggle('over-photo', !!hit);
@@ -681,7 +724,7 @@
       left: d.left - s.left + 'px', top: d.top - s.top + 'px',
       width: B.w * d.f + 'px', height: B.h * d.f + 'px',
     });
-    const c = hit === 'date' ? dateAt(p) : hit === 'dna' ? SINFORGE.gfx.dnaBox : SINFORGE.gfx.codeBox, pad = hit === 'date' ? DATE_PAD : 8;
+    const c = hit === 'date' ? dateAt(p) : SINFORGE.gfx[BOXES[hit]], pad = hit === 'date' ? DATE_PAD : 8;
     const poly = hit === 'photo' ? B.photo.poly
       : [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
     svg.firstElementChild.setAttribute('points', poly.map((p) => p.join(',')).join(' '));
@@ -838,6 +881,7 @@
     buildBlankSelect();
     buildFramePick();
     buildCodePick();
+    buildChipPick();
     buildDatePick();
     buildTextFields();
     buildSchemes();

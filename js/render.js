@@ -167,6 +167,25 @@
     });
   };
 
+  // The selected chip (js/chips.js) in the square slot `box`: accent / ink
+  // fills, ink outlines. The box is kept in gfx.chipBox (native px) for the
+  // stage's click target.
+  gfx.chip = function chip(ctx, box, st) {
+    gfx.chipBox = box;
+    ctx.lineWidth = box.w * 0.025; ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+    ctx.strokeStyle = st.ink;
+    SINFORGE.chip(st).shapes(box).forEach((sh) => {
+      ctx.beginPath();
+      if (sh.c) ctx.arc(sh.c[0], sh.c[1], sh.c[2], 0, Math.PI * 2);
+      else {
+        (sh.p || sh.l).forEach(([x, y], i) => ctx[i ? 'lineTo' : 'moveTo'](x, y));
+        if (sh.p) ctx.closePath();
+      }
+      if (sh.fill) { ctx.fillStyle = sh.fill === 'accent' ? st.accent : st.ink; ctx.fill(); }
+      if (sh.l || sh.stroke) ctx.stroke();
+    });
+  };
+
   // ---- photo: the source picture framed into a box, then the photo effect.
   // Mono / halftone / dither turn it into pure ink on transparent, so the card
   // colour shows through the light parts. Cached by its inputs: the processing
@@ -442,6 +461,7 @@
     drawWatermark(ctx, B, st);
     gfx.codeBox = null; // set again by gfx.code if the blank draws a barcode
     gfx.dnaBox = null;  // set by a blank that draws a DNA strip (its click target)
+    gfx.chipBox = null; // set by gfx.chip
     gfx.dateBoxes = []; // filled by gfx.date
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });
 
