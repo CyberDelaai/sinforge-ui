@@ -133,13 +133,13 @@
         gfx.text(ctx, doc.name1, nx, 1210, { size: 92, maxW: nameW, color: ink });
         gfx.text(ctx, doc.name2, nx, 1302, { size: 92, maxW: nameW, color: ink });
 
-        // footer line, rule, barcode
-        const footMax = st.barcode ? 580 : 790;
+        // footer line, rule, barcode (a 2D code is narrower: the rule runs on)
+        const footMax = !st.barcode ? 790 : SINFORGE.codeSquare(st) ? 630 : 580;
         gfx.text(ctx, doc.footer, 252, 1392, { size: 44, maxW: footMax, color: ink, weight: 400, spacing: 0.06 });
         ctx.fillStyle = ink;
         ctx.fillRect(250, 1428, footMax - 30, 6);
         gfx.slant(ctx, 250 + footMax - 26, 1422, 1440, 30, 0);
-        if (st.barcode) gfx.barcode(ctx, 860, 1336, 160, 104, doc.number, ink);
+        if (st.barcode) gfx.code(ctx, k, { x: 860, y: 1336, w: 160, h: 104 }, doc.number, st);
       },
     },
 
@@ -188,6 +188,15 @@
           gfx.text(ctx, val, x, valBase, { size, maxW, color: ink });
           return valBase + ROW_GAP; // the next row's top
         };
+        // A 2D barcode gets a square slot in the bottom-right corner, spanning
+        // the DISTRICT and status rows (DISTRICT's top down to the status
+        // baseline), flush with the issuer band's right edge — or clear of the
+        // stripes when they run down beside it (no chip).
+        const districtTop = 222 + rowH(BIG) + 3 * rowH(VAL) + 4 * ROW_GAP;
+        const sq = st.barcode && SINFORGE.codeSquare(st);
+        const sqSize = bottom - districtTop;
+        const sqX = (st.stripes && !st.chip ? 1420 : 1450) - sqSize;
+        const besideSq = sqX - 30 - 660; // text width left of it
 
         // outer edge line + inner contour
         if (st.edge) {
@@ -222,7 +231,7 @@
         // barcode, to the same end as the left run)
         const longStripes = st.stripes && !st.chip;
         if (st.stripes) {
-          const end = !longStripes ? 390 : st.barcode ? statusTop - 24 : bottom - 8;
+          const end = !longStripes ? 390 : st.barcode ? (sq ? districtTop : statusTop) - 24 : bottom - 8;
           gfx.stripes(ctx, 596, 624, 230, bottom - 8, ink, false);
           gfx.stripes(ctx, 1422, 1450, 230, end, ink, true);
         }
@@ -240,7 +249,7 @@
         y = field('SIN NO.', doc.number, X, y, 470);
         field('EXPIRES', doc.expires, 950, y, 270);
         y = field('DATE OF BIRTH', doc.dob, X, y, 270);
-        y = field('DISTRICT', doc.district, X, y, longStripes ? 740 : 760);
+        y = field('DISTRICT', doc.district, X, y, sq ? besideSq : longStripes ? 740 : 760);
 
         // contact chip in the accent colour
         if (st.chip) {
@@ -264,10 +273,11 @@
           ctx.stroke();
         }
 
-        // status line in the accent colour, barcode beside it
+        // status line in the accent colour, barcode beside it (or the 2D code)
         // (baseline level with the photo window's bottom)
-        gfx.text(ctx, doc.status, X, bottom, { size: STATUS, maxW: st.barcode ? 490 : 760, color: st.accent });
-        if (st.barcode) gfx.barcode(ctx, 1180, statusTop, 240, bottom - statusTop, doc.number, ink);
+        gfx.text(ctx, doc.status, X, bottom, { size: STATUS, maxW: sq ? besideSq : st.barcode ? 490 : 760, color: st.accent });
+        if (sq) gfx.code(ctx, k, { x: sqX, y: districtTop, w: sqSize, h: sqSize }, doc.number, st);
+        else if (st.barcode) gfx.code(ctx, k, { x: 1180, y: statusTop, w: 240, h: bottom - statusTop }, doc.number, st);
 
         // machine-readable zone: two fixed-pitch lines built from the fields
         if (st.mrz) {

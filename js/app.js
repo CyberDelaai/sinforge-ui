@@ -219,6 +219,45 @@
       box.appendChild(btn);
     });
   }
+
+  // ---- barcode picker: one icon per code, drawn from the code's own geometry
+  // (a fixed seed, so the icons never change); the name is the tooltip ----
+  function codeIcon(key) {
+    const def = SINFORGE.codes[key];
+    const box = def.square ? { x: 10, y: 10, w: 80, h: 80 } : { x: 0, y: 20, w: 100, h: 60 };
+    const f = (v) => +v.toFixed(2);
+    return '<svg viewBox="-4 -4 108 108" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges" aria-hidden="true">'
+      + def.shapes(box, 'SIN-0304-7731').map((sh) => {
+        const cls = sh.accent ? 'bi-accent' : 'bi-mark';
+        if (sh.r) return `<rect class="${cls}" x="${f(sh.r[0])}" y="${f(sh.r[1])}" width="${f(sh.r[2])}" height="${f(sh.r[3])}"/>`;
+        if (sh.c) return `<circle class="${cls}" cx="${f(sh.c[0])}" cy="${f(sh.c[1])}" r="${f(sh.c[2])}"/>`;
+        return '';
+      }).join('') + '</svg>';
+  }
+  function buildCodePick() {
+    const box = $('codePick');
+    box.innerHTML = '';
+    SINFORGE.codeOrder.forEach((key) => {
+      const k = 'bc_' + key;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt';
+      btn.dataset.code = key;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('data-i18n-title', k);
+      btn.title = t(k);
+      btn.innerHTML = codeIcon(key);
+      btn.onclick = () => {
+        if (S.style.code === key) return;
+        S.style.code = key;
+        persist.style();
+        syncControls();
+        requestRender();
+      };
+      box.appendChild(btn);
+    });
+  }
+
   // Icons follow the geometry: frame icons the active blank's photo box, blank
   // icons the selected frame — redrawn only when one of those changed.
   let iconSig = '';
@@ -232,6 +271,10 @@
     }
     $('framePick').querySelectorAll('.blank-opt').forEach((btn) => {
       btn.setAttribute('aria-checked', String(btn.dataset.frame === S.style.frame));
+    });
+    const code = SINFORGE.codes[S.style.code] ? S.style.code : 'code128';
+    $('codePick').querySelectorAll('.blank-opt').forEach((btn) => {
+      btn.setAttribute('aria-checked', String(btn.dataset.code === code));
     });
   }
   const DIE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
@@ -562,7 +605,8 @@
     $('copyBtn').addEventListener('click', copyPng);
   }
 
-  // ---- stage: click the photo for the frame picker, drag it to pan, wheel to zoom ----
+  // ---- stage: click the photo for the frame picker (drag it to pan, wheel to
+  // zoom), click the barcode for the barcode picker ----
   // The canvas as drawn: the element box can be letterboxed (object-fit:
   // contain + min-height), so map through the drawn image's rect, not the element's.
   function drawnRect() {
@@ -574,29 +618,40 @@
     const d = drawnRect();
     return { x: (e.clientX - d.left) / d.f, y: (e.clientY - d.top) / d.f };
   }
-  function inPhoto(p) {
-    const b = blank().photo.box;
-    return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+  const inBox = (p, b) => !!b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+  function inPhoto(p) { return inBox(p, blank().photo.box); }
+  // what a point on the canvas hits: 'photo', 'code' (the barcode as last
+  // rendered — gfx.codeBox) or null
+  function hitAt(p) {
+    if (inPhoto(p)) return 'photo';
+    return inBox(p, SINFORGE.gfx.codeBox) ? 'code' : null;
   }
-  // hover marker: the photo window's outline laid over the canvas
-  function showHover(on) {
+  // each click target's picker
+  const STAGE_POPS = { photo: 'framePop', code: 'codePop' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code' };
+  // hover marker: the photo window's outline (or the barcode's box) laid over the canvas
+  function showHover(hit) {
     const svg = $('photoHover');
-    $('docCanvas').classList.toggle('over-photo', on);
-    $('docCanvas').title = on ? t('hint_frame') : '';
-    svg.classList.toggle('show', on);
-    if (!on) return;
+    $('docCanvas').classList.toggle('over-photo', !!hit);
+    $('docCanvas').title = hit ? t(HINTS[hit]) : '';
+    svg.classList.toggle('show', !!hit);
+    if (!hit) return;
     const B = blank(), d = drawnRect(), s = $('stage').getBoundingClientRect();
     svg.setAttribute('viewBox', `0 0 ${B.w} ${B.h}`);
     Object.assign(svg.style, {
       left: d.left - s.left + 'px', top: d.top - s.top + 'px',
       width: B.w * d.f + 'px', height: B.h * d.f + 'px',
     });
-    svg.firstElementChild.setAttribute('points', B.photo.poly.map((p) => p.join(',')).join(' '));
+    const c = SINFORGE.gfx.codeBox, pad = 8;
+    const poly = hit === 'photo' ? B.photo.poly
+      : [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
+    svg.firstElementChild.setAttribute('points', poly.map((p) => p.join(',')).join(' '));
   }
-  // the frame picker pops up beside the click, kept inside the stage shell
-  function setFramePop(e) {
-    const pop = $('framePop');
-    if (!e) { pop.hidden = true; return; }
+  // a picker pops up beside the click, kept inside the stage shell; one at a time
+  function setStagePop(hit, e) {
+    Object.entries(STAGE_POPS).forEach(([h, id]) => { if (h !== hit || !e) $(id).hidden = true; });
+    if (!hit || !e) return;
+    const pop = $(STAGE_POPS[hit]);
     pop.hidden = false;
     const sh = $('stageShell').getBoundingClientRect();
     const x = clamp(e.clientX - sh.left + 14, 8, sh.width - pop.offsetWidth - 8);
@@ -604,22 +659,23 @@
     pop.style.left = x + 'px';
     pop.style.top = y + 'px';
   }
+  const closeStagePops = () => setStagePop(null);
   function bindStage() {
     const cv = $('docCanvas');
     let drag = null;
     cv.addEventListener('pointerdown', (e) => {
-      const p = docPoint(e);
-      if (!inPhoto(p)) return;
-      // a press that barely moves is a click (frame picker); more is a drag
-      drag = { x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, tx: S.tf.x, ty: S.tf.y, moved: false };
+      const p = docPoint(e), hit = hitAt(p);
+      if (!hit) return;
+      // a press that barely moves is a click (its picker); more drags the photo
+      drag = { hit, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, tx: S.tf.x, ty: S.tf.y, moved: false };
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener('pointermove', (e) => {
       const p = docPoint(e);
-      if (!drag) { showHover(inPhoto(p)); return; }
+      if (!drag) { showHover(hitAt(p)); return; }
       if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 5) return;
-      if (!S.photo) return;
-      if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(false); }
+      if (drag.hit !== 'photo' || !S.photo) return;
+      if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(null); }
       const b = blank().photo.box;
       S.tf.x = clamp(drag.tx + (p.x - drag.x) / b.w, -3, 3);
       S.tf.y = clamp(drag.ty + (p.y - drag.y) / b.h, -3, 3);
@@ -627,23 +683,24 @@
     });
     cv.addEventListener('pointerup', (e) => {
       if (!drag) return;
-      const wasDrag = drag.moved;
+      const { hit, moved } = drag;
       drag = null;
       cv.classList.remove('dragging');
-      if (wasDrag) persist.tf();
-      else setFramePop($('framePop').hidden ? e : null);
+      if (moved) persist.tf();
+      else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
-    cv.addEventListener('pointerleave', () => { if (!drag) showHover(false); });
-    $('framePop').querySelector('.adj-close').addEventListener('click', () => setFramePop(null));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setFramePop(null); });
-    // a press anywhere but the picker or the photo closes it (a click on the
-    // photo toggles it)
+    cv.addEventListener('pointerleave', () => { if (!drag) showHover(null); });
+    Object.values(STAGE_POPS).forEach((id) => $(id).querySelector('.adj-close').addEventListener('click', closeStagePops));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeStagePops(); });
+    // a press anywhere but a picker or a click target closes them (a click on
+    // the target toggles its picker)
     document.addEventListener('pointerdown', (e) => {
-      if ($('framePop').contains(e.target) || (e.target === cv && inPhoto(docPoint(e)))) return;
-      setFramePop(null);
+      if (Object.values(STAGE_POPS).some((id) => $(id).contains(e.target))) return;
+      if (e.target === cv && hitAt(docPoint(e))) return;
+      closeStagePops();
     });
-    window.addEventListener('resize', () => setFramePop(null));
+    window.addEventListener('resize', closeStagePops);
     cv.addEventListener('wheel', (e) => {
       if (!inPhoto(docPoint(e)) || !S.photo) return;
       e.preventDefault();
@@ -737,6 +794,7 @@
     restore();
     buildBlankSelect();
     buildFramePick();
+    buildCodePick();
     buildTextFields();
     buildSchemes();
     bindControls();

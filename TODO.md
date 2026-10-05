@@ -6,7 +6,7 @@ Items are removed from the list once they are implemented / resolved (no archive
 ## BIG (Y version bump)
 
 1. More blanks: keycard, corp badge.
-2. More decorations (chip, hologram sticker, QR-like code, corner brackets,
+2. More decorations (chip, hologram sticker, corner brackets,
    warning labels) and per-element colour choices.
 3. More effects: glitch slices, RGB split, worn/scratched print, holo foil.
 4. Presets: save / load complete documents (text + look), with built-in examples.

@@ -46,6 +46,8 @@ SINFORGE.newStyle = () => ({
   ...SINFORGE.schemes.paper,
   // portrait frame: key into SINFORGE.frames (js/frames.js)
   frame: 'notch',
+  // barcode type: key into SINFORGE.codes (js/codes.js)
+  code: 'code128',
   // decorations (on/off)
   stripes: true,   // hazard stripe columns along the side recesses
   slashes: true,   // slanted bars after the badge number

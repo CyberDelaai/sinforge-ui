@@ -120,19 +120,37 @@
     }
   };
 
-  // A barcode-looking pattern derived from `seed` text (not a real symbology).
-  gfx.barcode = function barcode(ctx, x, y, w, h, seed, color) {
-    const r = rng(hash(seed || 'SINFORGE'));
-    const bars = [];
-    let units = 0;
-    for (let i = 0; i < 34; i++) {
-      const bw = 1 + Math.floor(r() * 3), gap = 1 + Math.floor(r() * 2);
-      bars.push([units, bw]);
-      units += bw + gap;
+  gfx.rng = rng;
+  gfx.hash = hash;
+
+  // The selected barcode (js/codes.js) in the slot `box`, encoding `seed`.
+  // 2D codes take a square at the slot's right edge. Edges snap to device
+  // pixels, so bars stay crisp and adjacent modules never show seams. The
+  // box drawn is kept in gfx.codeBox (native px) for the stage's click target.
+  gfx.code = function code(ctx, k, box, seed, st) {
+    const def = SINFORGE.code(st);
+    if (def.square) {
+      const s = Math.min(box.w, box.h);
+      box = { x: box.x + box.w - s, y: box.y + (box.h - s) / 2, w: s, h: s };
     }
-    const u = w / units;
-    ctx.fillStyle = color;
-    bars.forEach(([at, bw]) => ctx.fillRect(x + at * u, y, bw * u, h));
+    gfx.codeBox = box;
+    const snap = (v) => Math.round(v * k) / k;
+    def.shapes(box, seed).forEach((sh) => {
+      ctx.fillStyle = sh.accent ? st.accent : st.ink;
+      if (sh.r) {
+        const [x, y, w, h] = sh.r, x0 = snap(x), y0 = snap(y);
+        ctx.fillRect(x0, y0, Math.max(snap(x + w) - x0, 1 / k), snap(y + h) - y0);
+      } else if (sh.c) {
+        ctx.beginPath();
+        ctx.arc(sh.c[0], sh.c[1], sh.c[2], 0, Math.PI * 2);
+        ctx.fill();
+      } else if (sh.t) {
+        // centred on x: measure at the fitted size, then draw from the left edge
+        gfx.fitFont(ctx, sh.t, 400, sh.size, sh.w, 0.1);
+        const w = ctx.measureText(sh.t).width;
+        gfx.text(ctx, sh.t, sh.x - w / 2, sh.y, { size: sh.size, maxW: sh.w, color: ctx.fillStyle, weight: 400, spacing: 0.1 });
+      }
+    });
   };
 
   // ---- photo: the source picture framed into a box, then the photo effect.
@@ -408,6 +426,7 @@
     ctx.clip();
 
     drawWatermark(ctx, B, st);
+    gfx.codeBox = null; // set again by gfx.code if the blank draws a barcode
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });
 
     if (st.grain) {
