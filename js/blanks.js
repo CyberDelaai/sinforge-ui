@@ -3,8 +3,11 @@
   // ---- Blank library: SINFORGE.blanks[key] = one pre-defined document.
   //   w, h      native size in px (the 1x export); 2x doubles it
   //   outline   card silhouette, a clockwise polygon — outside it the PNG is transparent
-  //   photo     { poly, box }: the photo window (clip polygon + its bounding box,
-  //             which the framing drag / zoom works in)
+  //   portrait  { box, cut, line }: where the photo sits (its bounding box, which
+  //             the framing drag / zoom works in), the frame's corner-cut size and
+  //             line width; the window's shape comes from the selected portrait
+  //             frame (js/frames.js)
+  //   photo     getter: SINFORGE.frameWindow(this.portrait) — { box, poly, ... }
   //   texts     text slots, in panel order: { id (key in S.doc), label (i18n key), max,
   //             gen? (key in SINFORGE.gen — adds a GENERATE button beside the field) }
   //   names     optional { first, last, title? }: slot ids the name generator
@@ -39,7 +42,7 @@
     [770, 1530], [745, 1555], [455, 1555], [430, 1530], [190, 1530], [100, 1440],
     [100, 930], [140, 890], [140, 430], [100, 390],
   ];
-  const EVENT_PHOTO = [[250, 250], [740, 250], [850, 360], [850, 1090], [360, 1090], [250, 980]];
+  const EVENT_PORTRAIT = { box: { x: 250, y: 250, w: 600, h: 840 }, cut: 110, line: 18 };
 
   const ID_OUTLINE = [
     [60, 140], [130, 70], [980, 70], [1005, 45], [1295, 45], [1320, 70], [1470, 70], [1540, 140],
@@ -52,17 +55,15 @@
   // runs on to 878 (40 above the inner contour, as the photo sits 40 below the
   // issuer band) when the MRZ is off — the photo window grows to match.
   const ID_BOTTOM = { mrz: 800, full: 878 };
-  const idPhoto = (b) => ({
-    poly: [[130, 220], [510, 220], [570, 280], [570, b], [190, b], [130, b - 60]],
-    box: { x: 130, y: 220, w: 440, h: b - 220 },
-  });
-  const ID_PHOTO = { mrz: idPhoto(ID_BOTTOM.mrz), full: idPhoto(ID_BOTTOM.full) };
+  const idPortrait = (b) => ({ box: { x: 130, y: 220, w: 440, h: b - 220 }, cut: 60, line: 14 });
+  const ID_PORTRAIT = { mrz: idPortrait(ID_BOTTOM.mrz), full: idPortrait(ID_BOTTOM.full) };
 
   const blanks = {
     'event-badge': {
       w: 1200, h: 1600,
       outline: EVENT_OUTLINE,
-      photo: { poly: EVENT_PHOTO, box: { x: 250, y: 250, w: 600, h: 840 } },
+      portrait: EVENT_PORTRAIT,
+      get photo() { return SINFORGE.frameWindow(this.portrait); },
       texts: [
         { id: 'number', label: 'f_number', max: 16, gen: 'serial' },
         { id: 'role', label: 'f_role', max: 16 },
@@ -102,23 +103,8 @@
           if (x < 800) gfx.slant(ctx, x + 6, 168, 212, 840 - x - 6 - 22, 22);
         }
 
-        // photo, clipped to its window, then the window's frame
-        const { poly, box } = this.photo;
-        const pic = gfx.photo(box, k);
-        if (pic) {
-          ctx.save();
-          gfx.poly(ctx, EVENT_PHOTO);
-          ctx.clip();
-          ctx.drawImage(pic, box.x, box.y, box.w, box.h);
-          ctx.restore();
-        }
-        gfx.poly(ctx, EVENT_PHOTO);
-        ctx.strokeStyle = ink; ctx.lineWidth = 18; ctx.lineJoin = 'miter';
-        ctx.stroke();
-        ctx.fillStyle = ink;
-        ctx.fillRect(520, 241, 200, 26);   // thick run on the top edge
-        ctx.fillRect(380, 1073, 180, 26);  // and on the bottom edge
-        ctx.fillRect(833, 520, 26, 160);   // and on the right edge
+        // photo, clipped to its window, then the portrait frame
+        gfx.portrait(ctx, this.photo, k, st);
 
         // role tag: vertical, reads top to bottom, in the accent colour
         if (doc.role) {
@@ -160,9 +146,10 @@
     'citizen-id': {
       w: 1600, h: 1010,
       outline: ID_OUTLINE,
-      // a getter: the window depends on the MRZ toggle (render, framing drag and
-      // the watermark hole all read it through here)
-      get photo() { return SINFORGE.state.style.mrz ? ID_PHOTO.mrz : ID_PHOTO.full; },
+      // a getter: the window grows when the MRZ is off (render, framing drag and
+      // the watermark hole all read it through `photo`)
+      get portrait() { return SINFORGE.state.style.mrz ? ID_PORTRAIT.mrz : ID_PORTRAIT.full; },
+      get photo() { return SINFORGE.frameWindow(this.portrait); },
       texts: [
         { id: 'issuer', label: 'f_issuer', max: 32 },
         { id: 'number', label: 'f_sin', max: 16, gen: 'serial' },
@@ -228,22 +215,8 @@
           gfx.stripes(ctx, 1440, 1468, 446, 606, ink, true);
         }
 
-        // photo, clipped to its window, then the window's frame
-        const { poly, box } = this.photo;
-        const pic = gfx.photo(box, k);
-        if (pic) {
-          ctx.save();
-          gfx.poly(ctx, poly);
-          ctx.clip();
-          ctx.drawImage(pic, box.x, box.y, box.w, box.h);
-          ctx.restore();
-        }
-        gfx.poly(ctx, poly);
-        ctx.strokeStyle = ink; ctx.lineWidth = 14; ctx.lineJoin = 'miter';
-        ctx.stroke();
-        ctx.fillStyle = ink;
-        ctx.fillRect(250, 210, 180, 22);  // thick run on the top edge
-        ctx.fillRect(560, (220 + bottom) / 2 - 70, 22, 140);  // and mid-way down the right edge
+        // photo, clipped to its window, then the portrait frame
+        gfx.portrait(ctx, this.photo, k, st);
 
         // data fields
         const X = 660;

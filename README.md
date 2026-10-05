@@ -12,7 +12,7 @@ client-side; your images are never uploaded.
 
 ## Features
 
-- **Blanks** — pick a pre-defined document from icons showing each one's
+- **Blanks** — pick a pre-defined document from the icon bar above the canvas, each icon showing its
   shape (silhouette + photo window); everything else is filled in on top
   of it. **EVENT BADGE** (1200×1600 vertical con badge) and **CITIZEN ID**
   (1600×1010 horizontal ID card, CR80 proportions: issuer band, photo, labelled
@@ -33,6 +33,9 @@ client-side; your images are never uploaded.
   your own free key every region draws from Behind the Name. If a service is
   unreachable it falls back to the built-in names, so it works offline too.
   The key is stored only in your browser.
+- **Portrait frame** — click the photo (hovering outlines it) to pick the
+  window's shape: cut corners, viewfinder (corner brackets), octagon (double line),
+  shield, scope (oval with crosshair ticks) or slanted. Works on every blank.
 - **Photo** — upload, drop or paste an image; drag it to move, scroll to zoom.
   Defaults to the C-DOGGO, the cyberdeck.tools mascot. Photo FX (third icon at
   the stage's top-left corner): original,

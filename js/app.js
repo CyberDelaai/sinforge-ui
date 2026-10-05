@@ -58,6 +58,7 @@
     merge(S.out, load('sinforge:out'));
     merge(S.names, load('sinforge:names'));
     if (S.out.scale !== 1 && S.out.scale !== 2) S.out.scale = 1;
+    if (!SINFORGE.frames[S.style.frame]) S.style.frame = 'notch';
   }
 
   // ---- render scheduling: at most one preview render per frame ----
@@ -180,6 +181,57 @@
   function syncBlankPick() {
     $('blankPick').querySelectorAll('.blank-opt').forEach((b) => {
       b.setAttribute('aria-checked', String(b.dataset.blank === S.blank));
+    });
+  }
+
+  // ---- portrait frame picker: one icon per frame, drawn on the active blank's
+  // photo box (so the icons share its proportions); the name is the tooltip ----
+  function frameIcon(key) {
+    const win = SINFORGE.frameWindow(blank().portrait, key);
+    const pts = (poly) => poly.map((p) => p.map((v) => +v.toFixed(1)).join(',')).join(' ');
+    const { x, y, w, h } = win.box, pad = blank().portrait.line * 1.5;
+    const sw = win.line < blank().portrait.line ? 1 : 2; // thin-lined frames stay thin
+    return `<svg viewBox="${x - pad} ${y - pad} ${w + 2 * pad} ${h + 2 * pad}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`
+      + `<polygon class="bi-frame" style="stroke-width:${sw}px" vector-effect="non-scaling-stroke" points="${pts(win.poly)}"/>`
+      + win.marks.map((m) => `<polygon class="bi-mark" points="${pts(m)}"/>`).join('')
+      + win.accent.map((m) => `<polygon class="bi-accent" points="${pts(m)}"/>`).join('')
+      + '</svg>';
+  }
+  function buildFramePick() {
+    const box = $('framePick');
+    box.innerHTML = '';
+    SINFORGE.frameOrder.forEach((key) => {
+      const k = 'pf_' + key;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt';
+      btn.dataset.frame = key;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('data-i18n-title', k);
+      btn.title = t(k);
+      btn.onclick = () => {
+        if (S.style.frame === key) return;
+        S.style.frame = key;
+        persist.style();
+        syncControls();
+        requestRender();
+      };
+      box.appendChild(btn);
+    });
+  }
+  // Icons follow the geometry: frame icons the active blank's photo box, blank
+  // icons the selected frame — redrawn only when one of those changed.
+  let iconSig = '';
+  function syncPickers() {
+    const b = blank().portrait.box;
+    const sig = [S.blank, S.style.frame, b.x, b.y, b.w, b.h].join('|');
+    if (sig !== iconSig) {
+      iconSig = sig;
+      $('framePick').querySelectorAll('.blank-opt').forEach((btn) => { btn.innerHTML = frameIcon(btn.dataset.frame); });
+      $('blankPick').querySelectorAll('.blank-opt').forEach((btn) => { btn.innerHTML = blankIcon(SINFORGE.blanks[btn.dataset.blank]); });
+    }
+    $('framePick').querySelectorAll('.blank-opt').forEach((btn) => {
+      btn.setAttribute('aria-checked', String(btn.dataset.frame === S.style.frame));
     });
   }
   const DIE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
@@ -413,6 +465,7 @@
       const sw = document.querySelector(`.side-switch[data-style="${k}"]`);
       if (sw) sw.closest('.fx-toggle').hidden = !decor.includes(k);
     });
+    syncPickers();
     $('zoomRange').value = Math.round(S.tf.zoom * 100);
     $('zoomVal').textContent = Math.round(S.tf.zoom * 100) + '%';
     $('scaleSwitch').dataset.pos = S.out.scale === 2 ? 'right' : 'left';
@@ -506,45 +559,88 @@
     $('copyBtn').addEventListener('click', copyPng);
   }
 
-  // ---- stage: drag the photo to pan, wheel to zoom ----
-  function docPoint(e) {
-    // the element box can be letterboxed (object-fit: contain + min-height),
-    // so map through the drawn image's rect, not the element's
-    const cv = $('docCanvas'), r = cv.getBoundingClientRect(), B = blank();
+  // ---- stage: click the photo for the frame picker, drag it to pan, wheel to zoom ----
+  // The canvas as drawn: the element box can be letterboxed (object-fit:
+  // contain + min-height), so map through the drawn image's rect, not the element's.
+  function drawnRect() {
+    const r = $('docCanvas').getBoundingClientRect(), B = blank();
     const f = Math.min(r.width / B.w, r.height / B.h);
-    const ox = r.left + (r.width - B.w * f) / 2, oy = r.top + (r.height - B.h * f) / 2;
-    return { x: (e.clientX - ox) / f, y: (e.clientY - oy) / f, r };
+    return { f, left: r.left + (r.width - B.w * f) / 2, top: r.top + (r.height - B.h * f) / 2 };
+  }
+  function docPoint(e) {
+    const d = drawnRect();
+    return { x: (e.clientX - d.left) / d.f, y: (e.clientY - d.top) / d.f };
   }
   function inPhoto(p) {
     const b = blank().photo.box;
     return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+  }
+  // hover marker: the photo window's outline laid over the canvas
+  function showHover(on) {
+    const svg = $('photoHover');
+    $('docCanvas').classList.toggle('over-photo', on);
+    $('docCanvas').title = on ? t('hint_frame') : '';
+    svg.classList.toggle('show', on);
+    if (!on) return;
+    const B = blank(), d = drawnRect(), s = $('stage').getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${B.w} ${B.h}`);
+    Object.assign(svg.style, {
+      left: d.left - s.left + 'px', top: d.top - s.top + 'px',
+      width: B.w * d.f + 'px', height: B.h * d.f + 'px',
+    });
+    svg.firstElementChild.setAttribute('points', B.photo.poly.map((p) => p.join(',')).join(' '));
+  }
+  // the frame picker pops up beside the click, kept inside the stage shell
+  function setFramePop(e) {
+    const pop = $('framePop');
+    if (!e) { pop.hidden = true; return; }
+    pop.hidden = false;
+    const sh = $('stageShell').getBoundingClientRect();
+    const x = clamp(e.clientX - sh.left + 14, 8, sh.width - pop.offsetWidth - 8);
+    const y = clamp(e.clientY - sh.top + 14, 8, sh.height - pop.offsetHeight - 8);
+    pop.style.left = x + 'px';
+    pop.style.top = y + 'px';
   }
   function bindStage() {
     const cv = $('docCanvas');
     let drag = null;
     cv.addEventListener('pointerdown', (e) => {
       const p = docPoint(e);
-      if (!inPhoto(p) || !S.photo) return;
-      drag = { x: p.x, y: p.y, tx: S.tf.x, ty: S.tf.y };
+      if (!inPhoto(p)) return;
+      // a press that barely moves is a click (frame picker); more is a drag
+      drag = { x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, tx: S.tf.x, ty: S.tf.y, moved: false };
       cv.setPointerCapture(e.pointerId);
-      cv.classList.add('dragging');
     });
     cv.addEventListener('pointermove', (e) => {
       const p = docPoint(e);
-      if (!drag) { cv.classList.toggle('over-photo', inPhoto(p) && !!S.photo); return; }
+      if (!drag) { showHover(inPhoto(p)); return; }
+      if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 5) return;
+      if (!S.photo) return;
+      if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(false); }
       const b = blank().photo.box;
       S.tf.x = clamp(drag.tx + (p.x - drag.x) / b.w, -3, 3);
       S.tf.y = clamp(drag.ty + (p.y - drag.y) / b.h, -3, 3);
       requestRender();
     });
-    const end = () => {
+    cv.addEventListener('pointerup', (e) => {
       if (!drag) return;
+      const wasDrag = drag.moved;
       drag = null;
       cv.classList.remove('dragging');
-      persist.tf();
-    };
-    cv.addEventListener('pointerup', end);
-    cv.addEventListener('pointercancel', end);
+      if (wasDrag) persist.tf();
+      else setFramePop($('framePop').hidden ? e : null);
+    });
+    cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
+    cv.addEventListener('pointerleave', () => { if (!drag) showHover(false); });
+    $('framePop').querySelector('.adj-close').addEventListener('click', () => setFramePop(null));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setFramePop(null); });
+    // a press anywhere but the picker or the photo closes it (a click on the
+    // photo toggles it)
+    document.addEventListener('pointerdown', (e) => {
+      if ($('framePop').contains(e.target) || (e.target === cv && inPhoto(docPoint(e)))) return;
+      setFramePop(null);
+    });
+    window.addEventListener('resize', () => setFramePop(null));
     cv.addEventListener('wheel', (e) => {
       if (!inPhoto(docPoint(e)) || !S.photo) return;
       e.preventDefault();
@@ -637,6 +733,7 @@
   function init() {
     restore();
     buildBlankSelect();
+    buildFramePick();
     buildTextFields();
     buildSchemes();
     bindControls();

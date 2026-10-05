@@ -44,6 +44,8 @@ SINFORGE.newDoc = () => ({
 // Default look: colours, decorations, photo + card effects.
 SINFORGE.newStyle = () => ({
   ...SINFORGE.schemes.paper,
+  // portrait frame: key into SINFORGE.frames (js/frames.js)
+  frame: 'notch',
   // decorations (on/off)
   stripes: true,   // hazard stripe columns along the side recesses
   slashes: true,   // slanted bars after the badge number
