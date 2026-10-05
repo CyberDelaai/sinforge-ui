@@ -65,6 +65,14 @@ SINFORGE.newStyle = () => ({
   scan: false, scanAmt: 25,   // scanlines, %
 });
 
+// Default name-generator settings (js/names.js). `key` is the user's own
+// Behind the Name API key — optional, kept only in this browser.
+SINFORGE.newNames = () => ({
+  gender: 'any',   // 'any' | 'm' | 'f'
+  region: 'any',   // key into the regions of js/names.js
+  key: '',
+});
+
 // Default photo framing: offsets as fractions of the photo frame, zoom >= 1 (cover).
 SINFORGE.newTransform = () => ({ x: 0, y: 0, zoom: 1 });
 
@@ -80,6 +88,7 @@ SINFORGE.state = {
   style: SINFORGE.newStyle(),     // look (sinforge:style)
   tf: SINFORGE.newTransform(),    // photo framing (sinforge:tf)
   out: { scale: 1 },              // export scale: 1 | 2 (sinforge:out)
+  names: SINFORGE.newNames(),     // name-generator settings (sinforge:names)
   photo: null,                    // source canvas of the photo (user upload in IndexedDB, else the doggo)
   photoIsUser: false,             // true when the photo came from the user
   wmImage: null,                  // source canvas of the watermark image (IndexedDB 'watermark')

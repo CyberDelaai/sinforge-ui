@@ -17,11 +17,16 @@
   const blank = () => SINFORGE.blanks[S.blank];
 
   // ---- helpers ----
+  // Status messages pop up as a toast at the bottom centre (ported from
+  // EIDOLON). kind: 'ok' | 'warn' | undefined (info). A new message replaces
+  // the current one; warnings linger a little longer. An empty msg is ignored.
   function setStatus(msg, kind) {
-    const el = $('status');
-    if (!el) return;
-    el.textContent = msg || '';
-    el.className = 'status' + (kind ? ' ' + kind : '');
+    const el = $('toast');
+    if (!el || !msg) return;
+    el.textContent = msg;
+    el.className = 'toast show' + (kind ? ' ' + kind : '');
+    clearTimeout(setStatus.timer);
+    setStatus.timer = setTimeout(() => el.classList.remove('show'), kind === 'warn' ? 3600 : 2200);
   }
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -42,6 +47,7 @@
     style: () => SINFORGE.save('sinforge:style', JSON.stringify(S.style)),
     tf: () => SINFORGE.save('sinforge:tf', JSON.stringify(S.tf)),
     out: () => SINFORGE.save('sinforge:out', JSON.stringify(S.out)),
+    names: () => SINFORGE.save('sinforge:names', JSON.stringify(S.names)),
   };
   function restore() {
     const b = (() => { try { return localStorage.getItem('sinforge:blank'); } catch (e) { return null; } })();
@@ -50,6 +56,7 @@
     merge(S.style, load('sinforge:style'));
     merge(S.tf, load('sinforge:tf'));
     merge(S.out, load('sinforge:out'));
+    merge(S.names, load('sinforge:names'));
     if (S.out.scale !== 1 && S.out.scale !== 2) S.out.scale = 1;
   }
 
@@ -204,7 +211,132 @@
         f.append(inp);
       }
       box.appendChild(f);
+      if (blank().names && slot.id === blank().names.last) box.appendChild(buildNameGen());
     });
+  }
+
+  // ---- name generator: GENERATE NAME + a settings toggle (js/names.js) ----
+  const COG_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M10.3 2h3.4l.5 2.6 1.8.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.8 2.6.5v3.4l-2.6.5-.8 1.8 1.5 2.2-2.4 2.4-2.2-1.5-1.8.8-.5 2.6h-3.4l-.5-2.6-1.8-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.8L2 13.7v-3.4l2.6-.5.8-1.8-1.5-2.2 2.4-2.4 2.2 1.5 1.8-.8z"/>'
+    + '<circle cx="12" cy="12" r="3.2"/></svg>';
+  const EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  let nameCfgOpen = false;
+  function setSlot(id, value) {
+    const slot = blank().texts.find((x) => x.id === id);
+    if (!slot) return;
+    S.doc[id] = String(value).slice(0, slot.max);
+    const inp = $('txt_' + id);
+    if (inp) inp.value = S.doc[id];
+  }
+  function generateName(btn) {
+    const N = blank().names;
+    btn.disabled = true;
+    btn.classList.add('busy');
+    SINFORGE.names.generate(S.names).then((r) => {
+      setSlot(N.first, r.first);
+      setSlot(N.last, r.last);
+      if (N.title) setSlot(N.title, r.gender === 'f' ? 'MS' : 'MR');
+      persist.doc();
+      requestRender();
+      if (r.fallback) setStatus(t(r.fallback === 'key' ? 'st_namekey' : 'st_namenet'), 'warn');
+      else setStatus(t('st_name'), 'ok');
+    }).finally(() => { btn.disabled = false; btn.classList.remove('busy'); });
+  }
+  function i18nEl(tag, key, cls) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    el.textContent = t(key);
+    el.setAttribute('data-i18n', key);
+    return el;
+  }
+  function nameSelect(key, opts) {
+    const sel = document.createElement('select');
+    sel.className = 'scale-select';
+    opts.forEach(([v, k]) => { const o = i18nEl('option', k); o.value = v; sel.appendChild(o); });
+    sel.value = S.names[key];
+    sel.addEventListener('change', () => { S.names[key] = sel.value; persist.names(); });
+    return sel;
+  }
+  function toggleRow(labelKey, control) {
+    const row = document.createElement('div');
+    row.className = 'fx-toggle';
+    row.append(i18nEl('span', labelKey, 'fx-label'), control);
+    return row;
+  }
+  function buildNameGen() {
+    const wrap = document.createElement('div');
+    wrap.className = 'name-gen field';
+    const row = document.createElement('div');
+    row.className = 'field-row';
+    const gen = document.createElement('button');
+    gen.type = 'button';
+    gen.className = 'btn btn-sm btn-gen';
+    gen.setAttribute('data-augmented-ui', 'tl-clip br-clip border');
+    gen.innerHTML = DIE_SVG;
+    gen.append(i18nEl('span', 'b_genname'));
+    gen.addEventListener('click', () => generateName(gen));
+    const cog = document.createElement('button');
+    cog.type = 'button';
+    cog.className = 'btn btn-icon';
+    cog.setAttribute('data-augmented-ui', 'tl-clip br-clip border');
+    cog.setAttribute('data-i18n-title', 'b_namecfg');
+    cog.title = t('b_namecfg');
+    cog.setAttribute('aria-label', t('b_namecfg'));
+    cog.setAttribute('aria-controls', 'nameCfg');
+    cog.innerHTML = COG_SVG;
+    row.append(gen, cog);
+
+    const cfg = document.createElement('div');
+    cfg.className = 'gen-config';
+    cfg.id = 'nameCfg';
+    cfg.append(
+      toggleRow('l_gender', nameSelect('gender', [['any', 'g_any'], ['m', 'g_m'], ['f', 'g_f']])),
+      toggleRow('l_region', nameSelect('region', SINFORGE.names.regions.map((id) => [id, 'r_' + id]))),
+    );
+    const kf = document.createElement('div');
+    kf.className = 'field mt';
+    const kl = i18nEl('label', 'l_btnkey');
+    kl.htmlFor = 'btnKey';
+    // masked like a password; the eye button reveals it while held down
+    const key = document.createElement('input');
+    key.type = 'password';
+    key.id = 'btnKey';
+    key.autocomplete = 'off';
+    key.spellcheck = false;
+    key.setAttribute('data-1p-ignore', '');
+    key.setAttribute('data-lpignore', 'true');
+    key.value = S.names.key;
+    key.placeholder = 'behindthename.com/api';
+    key.addEventListener('input', () => { S.names.key = key.value.trim(); persist.names(); });
+    const eye = document.createElement('button');
+    eye.type = 'button';
+    eye.className = 'btn btn-icon';
+    eye.setAttribute('data-augmented-ui', 'tl-clip br-clip border');
+    eye.setAttribute('data-i18n-title', 'b_showkey');
+    eye.title = t('b_showkey');
+    eye.setAttribute('aria-label', t('b_showkey'));
+    eye.innerHTML = EYE_SVG;
+    const reveal = (on) => { key.type = on ? 'text' : 'password'; eye.classList.toggle('active', on); };
+    eye.addEventListener('pointerdown', (e) => { e.preventDefault(); reveal(true); });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((ev) => eye.addEventListener(ev, () => reveal(false)));
+    eye.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); reveal(key.type === 'password'); } });
+    const keyRow = document.createElement('div');
+    keyRow.className = 'field-row';
+    keyRow.append(key, eye);
+    kf.append(kl, keyRow, i18nEl('p', 'hint_btnkey', 'hint mt'));
+    cfg.append(kf);
+
+    const setOpen = (open) => {
+      nameCfgOpen = open;
+      cfg.hidden = !open;
+      cog.classList.toggle('active', open);
+      cog.setAttribute('aria-expanded', String(open));
+    };
+    setOpen(nameCfgOpen);
+    cog.addEventListener('click', () => setOpen(!nameCfgOpen));
+    wrap.append(row, cfg);
+    return wrap;
   }
 
   // ---- right panel: colour schemes ----
@@ -468,7 +600,6 @@
       .catch(() => {}).then(requestRender);
     restorePhoto();
     restoreWatermark();
-    setStatus('');
   }
 
   document.addEventListener('DOMContentLoaded', init);

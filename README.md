@@ -18,6 +18,16 @@ client-side; your images are never uploaded.
   Long text shrinks to fit its slot. The die button next to the badge number
   generates a random serial in one of 5 formats (`#92-0329`, `SIN-2950-0982`,
   `NZ-4085-Z`, `C4:16:F4:79`, `NMS/22137`).
+- **Name generator** — GENERATE NAME fills both name lines and sets the title
+  to MR / MS to match the gender. The cog beside it opens its settings: gender, region
+  (anglo, French, German, Spanish, Italian, Nordic, Dutch, Slavic, Turkish,
+  Arabic, Indian, Japanese, Chinese, Korean, Brazilian, fantasy, mythic) and an
+  optional [Behind the Name](https://www.behindthename.com/api/) API key.
+  Without a key, real-world names come from [randomuser.me](https://randomuser.me/)
+  and the rest (fantasy, mythic, regions randomuser lacks) are built in; with
+  your own free key every region draws from Behind the Name. If a service is
+  unreachable it falls back to the built-in names, so it works offline too.
+  The key is stored only in your browser.
 - **Photo** — upload, drop or paste an image; drag it to move, scroll to zoom.
   Defaults to the C-DOGGO, the cyberdeck.tools mascot. Photo FX: original,
   threshold, halftone (dot size) or dither, with a level slider — the 1-bit modes

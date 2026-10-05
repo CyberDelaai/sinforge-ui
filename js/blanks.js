@@ -7,6 +7,8 @@
   //             which the framing drag / zoom works in)
   //   texts     text slots, in panel order: { id (key in S.doc), label (i18n key), max,
   //             gen? (key in SINFORGE.gen — adds a GENERATE button beside the field) }
+  //   names     optional { first, last, title? }: slot ids the name generator
+  //             fills — adds a GENERATE NAME row (+ its settings) after `last`
   //   decor     which decoration toggles apply (keys in S.style)
   //   draw(ctx, k, env)  paints the blank inside the clipped card body using
   //             env.gfx primitives; env.st is the style, env.doc the text.
@@ -46,6 +48,7 @@
         { id: 'name2', label: 'f_name2', max: 18 },
         { id: 'footer', label: 'f_footer', max: 32 },
       ],
+      names: { first: 'name1', last: 'name2', title: 'title' },
       decor: ['stripes', 'slashes', 'barcode', 'edge'],
 
       draw(ctx, k, { gfx, st, doc }) {

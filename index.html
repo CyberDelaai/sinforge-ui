@@ -1,4 +1,4 @@
-<!-- SINFORGE v0.2.0 -->
+<!-- SINFORGE v0.3.0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,7 +77,7 @@
         <a class="app-menu-item current" href="https://cyberdeck.tools/sinforge-ui/" aria-current="page">&gt; SINFORGE_</a>
       </nav>
     </div>
-    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.2.0</span></span></div>
+    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.3.0</span></span></div>
     <select class="lang-select" id="uiLangSel" aria-label="interface language"><option value="en">EN</option><option value="ru">RU</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="it">IT</option><option value="ja">JP</option><option value="zh">CN</option></select>
   </header>
 
@@ -191,11 +191,13 @@
         <div class="fx-toggle"><span class="fx-label"><span data-i18n="l_scale">SCALE</span> <span class="val" id="sizeVal"></span></span><button class="side-switch" type="button" id="scaleSwitch" data-pos="left"><span class="thumb"></span><span class="lab l">1×</span><span class="lab r">2×</span></button></div>
         <button id="exportBtn" class="btn btn-block" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_export">EXPORT PNG</button>
         <button id="copyBtn" class="btn btn-block btn-alt" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_copy">COPY TO CLIPBOARD</button>
-        <div class="status" id="status"></div>
       </aside>
     </div>
   </div>
 </div>
+
+<!-- toast: every status message pops up here (bottom centre), above the panels -->
+<div class="toast" id="toast" role="status" aria-live="polite" data-augmented-ui="tl-clip br-clip border"></div>
 
 <div class="footer-stamp" aria-hidden="true">SINFORGE (c) // 2026 // CYBERDELAAI // MIT</div>
 
@@ -205,6 +207,7 @@
 <script defer src="js/idb.js"></script>
 <script defer src="js/render.js"></script>
 <script defer src="js/blanks.js"></script>
+<script defer src="js/names.js"></script>
 <script defer src="js/app.js"></script>
 </body>
 </html>
