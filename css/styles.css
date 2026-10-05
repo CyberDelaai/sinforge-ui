@@ -153,6 +153,7 @@
   .btn:disabled { opacity: .4; cursor: not-allowed; background: transparent; box-shadow: none; }
   .btn-sm { height: 36px; padding: 0 12px; font-size: 12px; letter-spacing: 2px; }
   .btn-block { width: 100%; margin-top: 16px; }
+  #exportBtn::before { content: "⬇"; font-size: 1.6em; line-height: 1; letter-spacing: 0; }
   .btn-block + .btn-block { margin-top: 10px; }
   .btn-alt { --btn-color: var(--main); }
 
