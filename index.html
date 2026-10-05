@@ -1,4 +1,4 @@
-<!-- SINFORGE v0.3.2 -->
+<!-- SINFORGE v0.3.3 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,7 +77,7 @@
         <a class="app-menu-item current" href="https://cyberdeck.tools/sinforge-ui/" aria-current="page">&gt; SINFORGE_</a>
       </nav>
     </div>
-    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.3.2</span></span></div>
+    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.3.3</span></span></div>
     <select class="lang-select" id="uiLangSel" aria-label="interface language"><option value="en">EN</option><option value="ru">RU</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="it">IT</option><option value="ja">JP</option><option value="zh">CN</option></select>
   </header>
 
@@ -101,63 +101,96 @@
       <input type="file" id="fileInput" accept="image/*" hidden />
       <div class="fx-toggle"><span class="fx-label"><span data-i18n="l_zoom">ZOOM</span> <span class="val" id="zoomVal"></span></span><input type="range" class="potency-slider" id="zoomRange" min="100" max="500" step="1" /></div>
       <p class="hint mt" data-i18n="hint_photo">Drag the photo to move it, scroll to zoom. Drop or paste an image anywhere.</p>
-      <hr class="divider" />
-      <h3 class="sub" data-i18n="l_photofx">PHOTO FX</h3>
-      <div class="fx-toggle"><span class="fx-label" data-i18n="l_mode">MODE</span>
-        <select class="scale-select" data-style="photoFx">
-          <option value="none" data-i18n="fx_none">ORIGINAL</option>
-          <option value="mono" data-i18n="fx_mono">THRESHOLD</option>
-          <option value="halftone" data-i18n="fx_halftone">HALFTONE</option>
-          <option value="dither" data-i18n="fx_dither">DITHER</option>
-        </select>
-      </div>
-      <div class="fx-toggle" data-needs="photoFx!none"><span class="fx-label"><span data-i18n="l_level">LEVEL</span> <span class="val" data-val="photoLevel"></span></span><input type="range" class="potency-slider" data-style="photoLevel" min="0" max="100" step="1" /></div>
-      <div class="fx-toggle" data-needs="photoFx=halftone"><span class="fx-label"><span data-i18n="l_dot">DOT SIZE</span> <span class="val" data-val="photoDot"></span></span><input type="range" class="potency-slider" data-style="photoDot" min="4" max="24" step="1" /></div>
-      <hr class="divider" />
-      <h3 class="sub" data-i18n="l_wm">WATERMARK</h3>
-      <div class="fx-toggle"><span class="fx-label" data-i18n="l_mode">MODE</span>
-        <select class="scale-select" data-style="wm">
-          <option value="off" data-i18n="wm_off">OFF</option>
-          <option value="text" data-i18n="wm_text">TEXT</option>
-          <option value="image" data-i18n="wm_image">IMAGE</option>
-        </select>
-      </div>
-      <div class="fx-toggle" data-needs="wm!off"><span class="fx-label" data-i18n="l_tone">TONE</span>
-        <select class="scale-select" data-style="wmTone">
-          <option value="ink" data-i18n="c_ink">INK</option>
-          <option value="accent" data-i18n="c_accent">ACCENT</option>
-          <option value="custom" data-i18n="t_custom">CUSTOM</option>
-        </select>
-      </div>
-      <div class="fx-toggle" data-shows="wmTone=custom" data-needs="wm!off"><span class="fx-label" data-i18n="l_color">COLOUR</span><div class="fill-group"><button class="fill-swatch" type="button" data-augmented-ui="tl-clip br-clip border" data-pick="wmColor" aria-label="watermark colour"></button><input type="color" class="fill-input" data-style="wmColor" tabindex="-1" /></div></div>
-      <div class="field mt" data-shows="wm=text">
-        <input type="text" data-style="wmText" maxlength="32" spellcheck="false" aria-label="watermark text" />
-      </div>
-      <div data-shows="wm=image">
-        <div class="btn-row mt">
-          <button id="wmUploadBtn" class="btn btn-sm" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_upload">UPLOAD</button>
-          <button id="wmClearBtn" class="btn btn-sm" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_clear">CLEAR</button>
-        </div>
-        <input type="file" id="wmFileInput" accept="image/*" hidden />
-        <div class="fx-toggle"><span class="fx-label" data-i18n="l_tint">TINT</span><button class="side-switch" type="button" data-style="wmTint" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <div class="fx-toggle"><span class="fx-label" data-i18n="l_tile">TILE</span><button class="side-switch" type="button" data-style="wmTile" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <div class="fx-toggle" data-needs="wmTint=false"><span class="fx-label" data-i18n="l_invert">INVERT COLOURS</span><button class="side-switch" type="button" data-style="wmInvert" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <div class="fx-toggle"><span class="fx-label" data-i18n="l_blend">BLEND</span>
-          <select class="scale-select" data-style="wmBlend">
-            <option value="smart" data-i18n="bl_smart">SMART</option>
-            <option value="normal" data-i18n="bl_normal">NORMAL</option>
-          </select>
-        </div>
-      </div>
-      <div class="fx-toggle" data-needs="wm!off"><span class="fx-label"><span data-i18n="l_scale">SCALE</span> <span class="val" data-val="wmScale"></span></span><input type="range" class="potency-slider" data-style="wmScale" min="25" max="300" step="1" /></div>
-      <div class="fx-toggle" data-needs="wm!off"><span class="fx-label"><span data-i18n="l_rotation">ROTATION</span> <span class="val" data-val="wmRot"></span><span class="val">°</span></span><div class="dial" data-style="wmRot" data-default="-30" tabindex="0" role="slider" aria-valuemin="-180" aria-valuemax="180" aria-label="watermark rotation" data-i18n-title="hint_dial"><span class="dial-needle"></span></div></div>
-      <div class="fx-toggle" data-needs="wm!off"><span class="fx-label"><span data-i18n="l_potency">POTENCY</span> <span class="val" data-val="wmAmt"></span></span><input type="range" class="potency-slider" data-style="wmAmt" min="0" max="100" step="1" /></div>
     </aside>
 
     <!-- CENTER: live preview -->
     <main class="workspace">
-      <div class="stage" id="stage">
-        <canvas id="docCanvas" class="doc-canvas" aria-label="document preview"></canvas>
+      <!-- the stage + its EFFECTS / WATERMARK / PHOTO FX windows (opened by the corner
+           icons, float over the column to the left of the canvas — EIDOLON's .adj-pop) -->
+      <div class="stage-shell" id="stageShell">
+        <div class="stage" id="stage">
+          <button class="stage-tool" id="fxBtn" type="button" aria-expanded="false" aria-controls="fxPop" data-i18n-title="l_fx" title="EFFECTS">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" /></svg>
+          </button>
+          <button class="stage-tool stage-tool-2" id="wmBtn" type="button" aria-expanded="false" aria-controls="wmPop" data-i18n-title="l_wm" title="WATERMARK">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3z" opacity=".4" /><path d="M6 16L18 8M7 9.5l3 2M14 14l3 2" /></svg>
+          </button>
+          <button class="stage-tool stage-tool-3" id="photoFxBtn" type="button" aria-expanded="false" aria-controls="photoFxPop" data-i18n-title="l_photofx" title="PHOTO FX">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3z" opacity=".4" /><circle cx="12" cy="11" r="3" /><path d="M7 19c0-3 2-5 5-5s5 2 5 5" /></svg>
+          </button>
+          <canvas id="docCanvas" class="doc-canvas" aria-label="document preview"></canvas>
+        </div>
+        <div class="adj-pop config" id="fxPop" role="dialog" aria-labelledby="fxTitle" data-augmented-ui="tl-clip br-clip border" hidden>
+          <div class="modal-head">
+            <h2 id="fxTitle">// <span data-i18n="l_fx">EFFECTS</span></h2>
+            <button class="adj-close" type="button" aria-label="close">&times;</button>
+          </div>
+            <div class="fx-toggle"><span class="fx-label" data-i18n="e_glow">GLOW</span><button class="side-switch" type="button" data-style="glow" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+            <div class="fx-toggle" data-needs="glow"><span class="fx-label"><span data-i18n="l_amount">AMOUNT</span> <span class="val" data-val="glowAmt"></span></span><input type="range" class="potency-slider" data-style="glowAmt" min="5" max="100" step="1" /></div>
+            <div class="fx-toggle"><span class="fx-label" data-i18n="e_grain">GRAIN</span><button class="side-switch" type="button" data-style="grain" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+            <div class="fx-toggle" data-needs="grain"><span class="fx-label"><span data-i18n="l_amount">AMOUNT</span> <span class="val" data-val="grainAmt"></span></span><input type="range" class="potency-slider" data-style="grainAmt" min="5" max="100" step="1" /></div>
+            <div class="fx-toggle"><span class="fx-label" data-i18n="e_scan">SCANLINES</span><button class="side-switch" type="button" data-style="scan" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+            <div class="fx-toggle" data-needs="scan"><span class="fx-label"><span data-i18n="l_amount">AMOUNT</span> <span class="val" data-val="scanAmt"></span></span><input type="range" class="potency-slider" data-style="scanAmt" min="5" max="100" step="1" /></div>
+        </div>
+        <div class="adj-pop config" id="photoFxPop" role="dialog" aria-labelledby="photoFxTitle" data-augmented-ui="tl-clip br-clip border" hidden>
+          <div class="modal-head">
+            <h2 id="photoFxTitle">// <span data-i18n="l_photofx">PHOTO FX</span></h2>
+            <button class="adj-close" type="button" aria-label="close">&times;</button>
+          </div>
+          <div class="fx-toggle"><span class="fx-label" data-i18n="l_mode">MODE</span>
+            <select class="scale-select" data-style="photoFx">
+              <option value="none" data-i18n="fx_none">ORIGINAL</option>
+              <option value="mono" data-i18n="fx_mono">THRESHOLD</option>
+              <option value="halftone" data-i18n="fx_halftone">HALFTONE</option>
+              <option value="dither" data-i18n="fx_dither">DITHER</option>
+            </select>
+          </div>
+          <div class="fx-toggle" data-needs="photoFx!none"><span class="fx-label"><span data-i18n="l_level">LEVEL</span> <span class="val" data-val="photoLevel"></span></span><input type="range" class="potency-slider" data-style="photoLevel" min="0" max="100" step="1" /></div>
+          <div class="fx-toggle" data-needs="photoFx=halftone"><span class="fx-label"><span data-i18n="l_dot">DOT SIZE</span> <span class="val" data-val="photoDot"></span></span><input type="range" class="potency-slider" data-style="photoDot" min="4" max="24" step="1" /></div>
+        </div>
+        <div class="adj-pop config" id="wmPop" role="dialog" aria-labelledby="wmTitle" data-augmented-ui="tl-clip br-clip border" hidden>
+          <div class="modal-head">
+            <h2 id="wmTitle">// <span data-i18n="l_wm">WATERMARK</span></h2>
+            <button class="adj-close" type="button" aria-label="close">&times;</button>
+          </div>
+          <div class="fx-toggle"><span class="fx-label" data-i18n="l_mode">MODE</span>
+            <select class="scale-select" data-style="wm">
+              <option value="off" data-i18n="wm_off">OFF</option>
+              <option value="text" data-i18n="wm_text">TEXT</option>
+              <option value="image" data-i18n="wm_image">IMAGE</option>
+            </select>
+          </div>
+          <div class="fx-toggle" data-needs="wm!off"><span class="fx-label" data-i18n="l_tone">TONE</span>
+            <select class="scale-select" data-style="wmTone">
+              <option value="ink" data-i18n="c_ink">INK</option>
+              <option value="accent" data-i18n="c_accent">ACCENT</option>
+              <option value="custom" data-i18n="t_custom">CUSTOM</option>
+            </select>
+          </div>
+          <div class="fx-toggle" data-shows="wmTone=custom" data-needs="wm!off"><span class="fx-label" data-i18n="l_color">COLOUR</span><div class="fill-group"><button class="fill-swatch" type="button" data-augmented-ui="tl-clip br-clip border" data-pick="wmColor" aria-label="watermark colour"></button><input type="color" class="fill-input" data-style="wmColor" tabindex="-1" /></div></div>
+          <div class="field mt" data-shows="wm=text">
+            <input type="text" data-style="wmText" maxlength="32" spellcheck="false" aria-label="watermark text" />
+          </div>
+          <div data-shows="wm=image">
+            <div class="btn-row mt">
+              <button id="wmUploadBtn" class="btn btn-sm" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_upload">UPLOAD</button>
+              <button id="wmClearBtn" class="btn btn-sm" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_clear">CLEAR</button>
+            </div>
+            <input type="file" id="wmFileInput" accept="image/*" hidden />
+            <div class="fx-toggle"><span class="fx-label" data-i18n="l_tint">TINT</span><button class="side-switch" type="button" data-style="wmTint" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+            <div class="fx-toggle"><span class="fx-label" data-i18n="l_tile">TILE</span><button class="side-switch" type="button" data-style="wmTile" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+            <div class="fx-toggle" data-needs="wmTint=false"><span class="fx-label" data-i18n="l_invert">INVERT COLOURS</span><button class="side-switch" type="button" data-style="wmInvert" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+            <div class="fx-toggle"><span class="fx-label" data-i18n="l_blend">BLEND</span>
+              <select class="scale-select" data-style="wmBlend">
+                <option value="smart" data-i18n="bl_smart">SMART</option>
+                <option value="normal" data-i18n="bl_normal">NORMAL</option>
+              </select>
+            </div>
+          </div>
+          <div class="fx-toggle" data-needs="wm!off"><span class="fx-label"><span data-i18n="l_scale">SCALE</span> <span class="val" data-val="wmScale"></span></span><input type="range" class="potency-slider" data-style="wmScale" min="25" max="300" step="1" /></div>
+          <div class="fx-toggle" data-needs="wm!off"><span class="fx-label"><span data-i18n="l_rotation">ROTATION</span> <span class="val" data-val="wmRot"></span><span class="val">°</span></span><div class="dial" data-style="wmRot" data-default="-30" tabindex="0" role="slider" aria-valuemin="-180" aria-valuemax="180" aria-label="watermark rotation" data-i18n-title="hint_dial"><span class="dial-needle"></span></div></div>
+          <div class="fx-toggle" data-needs="wm!off"><span class="fx-label"><span data-i18n="l_potency">POTENCY</span> <span class="val" data-val="wmAmt"></span></span><input type="range" class="potency-slider" data-style="wmAmt" min="0" max="100" step="1" /></div>
+        </div>
       </div>
     </main>
 
@@ -176,14 +209,6 @@
         <div class="fx-toggle"><span class="fx-label" data-i18n="d_slashes">SLASHES</span><button class="side-switch" type="button" data-style="slashes" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
         <div class="fx-toggle"><span class="fx-label" data-i18n="d_barcode">BARCODE</span><button class="side-switch" type="button" data-style="barcode" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
         <div class="fx-toggle"><span class="fx-label" data-i18n="d_edge">EDGE LINE</span><button class="side-switch" type="button" data-style="edge" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <hr class="divider" />
-        <h3 class="sub" data-i18n="l_fx">EFFECTS</h3>
-        <div class="fx-toggle"><span class="fx-label" data-i18n="e_glow">GLOW</span><button class="side-switch" type="button" data-style="glow" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <div class="fx-toggle" data-needs="glow"><span class="fx-label"><span data-i18n="l_amount">AMOUNT</span> <span class="val" data-val="glowAmt"></span></span><input type="range" class="potency-slider" data-style="glowAmt" min="5" max="100" step="1" /></div>
-        <div class="fx-toggle"><span class="fx-label" data-i18n="e_grain">GRAIN</span><button class="side-switch" type="button" data-style="grain" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <div class="fx-toggle" data-needs="grain"><span class="fx-label"><span data-i18n="l_amount">AMOUNT</span> <span class="val" data-val="grainAmt"></span></span><input type="range" class="potency-slider" data-style="grainAmt" min="5" max="100" step="1" /></div>
-        <div class="fx-toggle"><span class="fx-label" data-i18n="e_scan">SCANLINES</span><button class="side-switch" type="button" data-style="scan" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
-        <div class="fx-toggle" data-needs="scan"><span class="fx-label"><span data-i18n="l_amount">AMOUNT</span> <span class="val" data-val="scanAmt"></span></span><input type="range" class="potency-slider" data-style="scanAmt" min="5" max="100" step="1" /></div>
       </aside>
 
       <aside class="config config-right" data-augmented-ui="tl-clip br-clip border">

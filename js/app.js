@@ -528,6 +528,30 @@
     }, { passive: false });
   }
 
+  // ---- EFFECTS / WATERMARK / PHOTO FX windows: the stage's top-left icons open them
+  // (one at a time), floating over the column to the left of the canvas
+  // (EIDOLON's COLOUR window). An icon names its window in aria-controls. ----
+  function setPopOpen(pop) {
+    document.querySelectorAll('.stage-tool[aria-controls]').forEach((btn) => {
+      const on = btn.getAttribute('aria-controls') === (pop && pop.id);
+      $(btn.getAttribute('aria-controls')).hidden = !on;
+      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+  }
+  function bindPops() {
+    document.querySelectorAll('.stage-tool[aria-controls]').forEach((btn) => {
+      const pop = $(btn.getAttribute('aria-controls'));
+      btn.addEventListener('click', () => setPopOpen(pop.hidden ? pop : null));
+      pop.querySelector('.adj-close').addEventListener('click', () => { setPopOpen(null); btn.focus(); });
+    });
+    const anyOpen = () => document.querySelector('.adj-pop:not([hidden])');
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && anyOpen()) setPopOpen(null); });
+    // stays open while working on the canvas; a press anywhere else closes it
+    document.addEventListener('pointerdown', (e) => {
+      if (anyOpen() && !$('stageShell').contains(e.target)) setPopOpen(null);
+    });
+  }
+
   // ---- drop / paste an image anywhere ----
   function bindDropPaste() {
     const stage = $('stage');
@@ -592,6 +616,7 @@
     buildSchemes();
     bindControls();
     bindStage();
+    bindPops();
     bindDropPaste();
     syncControls();
     requestRender();

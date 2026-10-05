@@ -29,10 +29,11 @@ client-side; your images are never uploaded.
   unreachable it falls back to the built-in names, so it works offline too.
   The key is stored only in your browser.
 - **Photo** — upload, drop or paste an image; drag it to move, scroll to zoom.
-  Defaults to the C-DOGGO, the cyberdeck.tools mascot. Photo FX: original,
+  Defaults to the C-DOGGO, the cyberdeck.tools mascot. Photo FX (third icon at
+  the stage's top-left corner): original,
   threshold, halftone (dot size) or dither, with a level slider — the 1-bit modes
   print the photo in the ink colour and let the card colour show through.
-- **Watermark** — text (repeated diagonally) or an uploaded image (tiled or
+- **Watermark** — opened from the second icon at the stage's top-left corner. Text (repeated diagonally) or an uploaded image (tiled or
   one centred, optionally tinted), with a tone (ink / accent / custom colour),
   scale and potency sliders and a rotation wheel (Shift snaps to 15°,
   double-click resets). Images can be colour-inverted and use a SMART blend:
@@ -44,7 +45,7 @@ client-side; your images are never uploaded.
   picture never prints as a negative.
 - **Decor** — side hazard stripes, slashes, barcode (derived from the badge
   number), edge line.
-- **Effects** — neon glow around the card, print grain, scanlines.
+- **Effects** — opened from the first icon at the stage's top-left corner: neon glow around the card, print grain, scanlines.
 - **Export** — PNG at 1× (1200×1600) or 2× (2400×3200), transparent outside
   the card shape.
   Or copy it straight to the clipboard to paste into Discord, a VTT or an editor.
