@@ -441,6 +441,7 @@
 
     drawWatermark(ctx, B, st);
     gfx.codeBox = null; // set again by gfx.code if the blank draws a barcode
+    gfx.dnaBox = null;  // set by a blank that draws a DNA strip (its click target)
     gfx.dateBoxes = []; // filled by gfx.date
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });
 

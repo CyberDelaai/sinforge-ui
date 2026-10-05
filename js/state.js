@@ -35,6 +35,7 @@ SINFORGE.newDoc = () => ({
   // citizen ID
   issuer: 'CITIZEN ID // SECTOR 7',
   sex: 'M',
+  metatype: 'HUMAN',
   dob: '2051-03-04',
   expires: '2084-12-31',
   district: 'NORTH HARBOR // BLOCK 12',
@@ -56,6 +57,8 @@ SINFORGE.newStyle = () => ({
   barcode: true,   // barcode in the bottom-right corner (encodes the number)
   edge: true,      // ink line along the outer edge
   chip: true,      // contact chip (citizen ID)
+  dna: true,       // DNA helix strip above the machine-readable zone (citizen ID)
+  dnaText: false,  // the DNA strip as a letter sequence instead of the helix (click it on the stage)
   mrz: true,       // machine-readable zone along the bottom (citizen ID)
   // photo effect: 'none' | 'mono' (threshold) | 'halftone' | 'dither'
   photoFx: 'halftone',

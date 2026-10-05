@@ -535,7 +535,7 @@
     });
     // per-blank decorations: hide toggles the active blank doesn't use
     const decor = blank().decor || [];
-    ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'mrz'].forEach((k) => {
+    ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'dna', 'mrz'].forEach((k) => {
       const sw = document.querySelector(`.side-switch[data-style="${k}"]`);
       if (sw) sw.closest('.fx-toggle').hidden = !decor.includes(k);
     });
@@ -656,15 +656,17 @@
     x: b.x - DATE_PAD, y: b.y - DATE_PAD, w: b.w + 2 * DATE_PAD, h: b.h + 2 * DATE_PAD,
   }));
   // what a point on the canvas hits: 'photo', 'code' (the barcode as last
-  // rendered — gfx.codeBox), 'date' or null
+  // rendered — gfx.codeBox), 'dna' (gfx.dnaBox), 'date' or null
   function hitAt(p) {
     if (inPhoto(p)) return 'photo';
     if (inBox(p, SINFORGE.gfx.codeBox)) return 'code';
+    if (inBox(p, SINFORGE.gfx.dnaBox)) return 'dna';
     return dateAt(p) ? 'date' : null;
   }
-  // each click target's picker
+  // each click target's picker (the DNA strip has none: a click flips it
+  // between the helix and the letters)
   const STAGE_POPS = { photo: 'framePop', code: 'codePop', date: 'datePop' };
-  const HINTS = { photo: 'hint_frame', code: 'hint_code', date: 'hint_date' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code', date: 'hint_date', dna: 'hint_dna' };
   // hover marker: the photo window's outline (or the barcode's / the hovered
   // date's box) laid over the canvas
   function showHover(hit, p) {
@@ -679,7 +681,7 @@
       left: d.left - s.left + 'px', top: d.top - s.top + 'px',
       width: B.w * d.f + 'px', height: B.h * d.f + 'px',
     });
-    const c = hit === 'date' ? dateAt(p) : SINFORGE.gfx.codeBox, pad = hit === 'date' ? DATE_PAD : 8;
+    const c = hit === 'date' ? dateAt(p) : hit === 'dna' ? SINFORGE.gfx.dnaBox : SINFORGE.gfx.codeBox, pad = hit === 'date' ? DATE_PAD : 8;
     const poly = hit === 'photo' ? B.photo.poly
       : [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
     svg.firstElementChild.setAttribute('points', poly.map((p) => p.join(',')).join(' '));
@@ -724,7 +726,11 @@
       drag = null;
       cv.classList.remove('dragging');
       if (moved) persist.tf();
-      else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
+      else if (hit === 'dna') {
+        closeStagePops();
+        S.style.dnaText = !S.style.dnaText;
+        persist.style(); requestRender();
+      } else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
     cv.addEventListener('pointerleave', () => { if (!drag) showHover(null); });

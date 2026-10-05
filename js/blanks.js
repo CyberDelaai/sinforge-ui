@@ -36,6 +36,10 @@
     serial: () => pick(SERIAL_PATTERNS).replace(/[9@%]/g, (c) => pick(POOLS[c])),
     dob: () => date(2020, 2060),
     expiry: () => date(2077, 2092),
+    metatype: () => {
+      const all = ['HUMAN', 'ELF', 'DWARF', 'ORK', 'TROLL', 'GNOME', 'HOBGOBLIN', 'SATYR', 'SASQUATCH', 'NARTAKI'];
+      return all[Math.floor(Math.random() * all.length)];
+    },
   };
 
   const EVENT_OUTLINE = [
@@ -55,12 +59,16 @@
   ];
   // The citizen ID's content ends at y = 800 above the machine-readable zone, or
   // runs on to 878 (40 above the inner contour, as the photo sits 40 below the
-  // issuer band) when the MRZ is off — the photo window grows to match.
+  // issuer band) when the MRZ is off — the photo window grows to match. The DNA
+  // strip, when on, takes the bottom DNA_H of that and the content ends DNA_GAP
+  // above it.
   const ID_BOTTOM = { mrz: 800, full: 878 };
+  const DNA_H = 32, DNA_GAP = 18;
+  const idBase = (st) => (st.mrz ? ID_BOTTOM.mrz : ID_BOTTOM.full);
+  const idBottom = (st) => idBase(st) - (st.dna ? DNA_H + DNA_GAP : 0);
   // The box's left edge sits half a frame line (7) inside x = 150, so the frame's
   // outer edge lines up with the issuer band and the MRZ rule.
   const idPortrait = (b) => ({ box: { x: 157, y: 220, w: 413, h: b - 220 }, cut: 60, line: 14 });
-  const ID_PORTRAIT = { mrz: idPortrait(ID_BOTTOM.mrz), full: idPortrait(ID_BOTTOM.full) };
 
   const blanks = {
     'event-badge': {
@@ -150,9 +158,9 @@
     'citizen-id': {
       w: 1600, h: 1010,
       outline: ID_OUTLINE,
-      // a getter: the window grows when the MRZ is off (render, framing drag and
-      // the watermark hole all read it through `photo`)
-      get portrait() { return SINFORGE.state.style.mrz ? ID_PORTRAIT.mrz : ID_PORTRAIT.full; },
+      // a getter: the window grows when the MRZ / DNA strip is off (render,
+      // framing drag and the watermark hole all read it through `photo`)
+      get portrait() { return idPortrait(idBottom(SINFORGE.state.style)); },
       get photo() { return SINFORGE.frameWindow(this.portrait); },
       texts: [
         { id: 'issuer', label: 'f_issuer', max: 32 },
@@ -160,13 +168,14 @@
         { id: 'name1', label: 'f_given', max: 24 },
         { id: 'name2', label: 'f_surname', max: 18 },
         { id: 'sex', label: 'f_sex', max: 3 },
+        { id: 'metatype', label: 'f_metatype', max: 12, gen: 'metatype' },
         { id: 'dob', label: 'f_dob', max: 10, gen: 'dob', date: true },
         { id: 'expires', label: 'f_expires', max: 10, gen: 'expiry', date: true },
         { id: 'district', label: 'f_district', max: 28 },
         { id: 'status', label: 'f_status', max: 24 },
       ],
       names: { first: 'name1', last: 'name2', sex: 'sex' },
-      decor: ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'mrz'],
+      decor: ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'dna', 'mrz'],
 
       draw(ctx, k, { gfx, st, doc }) {
         const ink = st.ink;
@@ -177,7 +186,7 @@
         // height is shared out evenly as the gap between rows (≈40 with the MRZ,
         // wider without it), so a row never reads as captioning the line above.
         const CAP = 22, CAP_GAP = 12, BIG = 76, VAL = 50, STATUS = 58, ROWS = 5;
-        const bottom = st.mrz ? ID_BOTTOM.mrz : ID_BOTTOM.full;
+        const bottom = idBottom(st);
         const capA = gfx.ascent(ctx, 'H', 400, CAP);
         const rowH = (size) => capA + CAP_GAP + gfx.ascent(ctx, 'H', 700, size);
         const statusTop = bottom - gfx.ascent(ctx, 'H', 700, STATUS);
@@ -247,7 +256,8 @@
         let y = 222; // level with the photo window's top
         const topW = st.stripes ? 740 : 760; // the top two rows clear the stripes
         y = field('SURNAME', doc.name2, X, y, topW, BIG);
-        y = field('GIVEN NAMES', doc.name1, X, y, topW);
+        field('METATYPE', doc.metatype, 1180, y, 240);
+        y = field('GIVEN NAMES', doc.name1, X, y, 490);
         field('SEX', doc.sex, 1180, y, 150);
         y = field('SIN NO.', doc.number, X, y, 470);
         field('EXPIRES', doc.expires, 950, y, 270, VAL, true);
@@ -281,6 +291,55 @@
         gfx.text(ctx, doc.status, X, bottom, { size: STATUS, maxW: sq ? besideSq : st.barcode ? 490 : 760, color: st.accent });
         if (sq) gfx.code(ctx, k, { x: sqX, y: districtTop, w: sqSize, h: sqSize }, doc.number, st);
         else if (st.barcode) gfx.code(ctx, k, { x: 1180, y: statusTop, w: 240, h: bottom - statusTop }, doc.number, st);
+
+        // DNA strip above the machine-readable zone: a caption, then a double
+        // helix — or, with dnaText (a click on the stage flips it), the plain
+        // letter sequence. Both are seeded by the holder's fields, so every card
+        // prints its own sequence (accent rungs / letters mark some bases).
+        if (st.dna) {
+          const top = idBase(st) - DNA_H, mid = top + DNA_H / 2;
+          gfx.dnaBox = { x: 150, y: top, w: 1300, h: DNA_H };
+          const r = gfx.rng(gfx.hash([doc.number, doc.name1, doc.name2, doc.dob, doc.metatype].join('|')));
+          const capW = gfx.text(ctx, 'DNA', 150, mid + capA / 2, { size: CAP, maxW: 100, color: ink, weight: 400, spacing: 0.14 });
+          const x0 = 150 + capW + 24, x1 = 1450, amp = DNA_H / 2 - 3;
+          if (st.dnaText) {
+            // fixed-pitch bases in groups of 6, one empty cell between groups
+            const SEQ = 30, pitch = 21.5;
+            ctx.font = `700 ${SEQ}px ${SINFORGE.const.FONT}`;
+            ctx.textBaseline = 'alphabetic';
+            ctx.textAlign = 'center';
+            const base = mid + gfx.ascent(ctx, 'H', 700, SEQ) / 2;
+            const n = Math.floor((x1 - x0) / pitch);
+            const lead = x0 + (x1 - x0 - n * pitch) / 2; // centre the run in its span
+            for (let i = 0; i < n; i++) {
+              const b = 'ACGT'[Math.floor(r() * 4)], accent = r() < 0.12;
+              if (i % 7 === 6) continue; // the gap after each group
+              ctx.fillStyle = accent ? st.accent : ink;
+              ctx.fillText(b, lead + pitch * (i + 0.5), base);
+            }
+            ctx.textAlign = 'left';
+          } else {
+            const P = 150, phase = r() * Math.PI * 2;
+            const yAt = (x, s) => mid + s * amp * Math.sin((x - x0) / P * Math.PI * 2 + phase);
+            // rungs: two half-bars per base pair, meeting in the middle
+            for (let x = x0 + 6; x < x1 - 4; x += 13) {
+              const ya = yAt(x, 1), yb = yAt(x, -1);
+              if (Math.abs(ya - yb) < 6) continue;
+              ctx.fillStyle = r() < 0.18 ? st.accent : ink;
+              ctx.fillRect(x - 2, Math.min(ya, mid), 4, Math.abs(ya - mid));
+              ctx.fillStyle = r() < 0.18 ? st.accent : ink;
+              ctx.fillRect(x - 2, Math.min(yb, mid), 4, Math.abs(yb - mid));
+            }
+            // the two backbones
+            ctx.strokeStyle = ink; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+            [1, -1].forEach((s) => {
+              ctx.beginPath();
+              for (let x = x0; x <= x1; x += 4) ctx[x === x0 ? 'moveTo' : 'lineTo'](x, yAt(x, s));
+              ctx.stroke();
+            });
+            ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+          }
+        }
 
         // machine-readable zone: two fixed-pitch lines built from the fields
         if (st.mrz) {

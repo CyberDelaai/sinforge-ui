@@ -16,10 +16,12 @@ client-side; your images are never uploaded.
   shape (silhouette + photo window); everything else is filled in on top
   of it. **EVENT BADGE** (1200×1600 vertical con badge) and **CITIZEN ID**
   (1600×1010 horizontal ID card, CR80 proportions: issuer band, photo, labelled
-  data fields, contact chip, machine-readable zone built from the fields).
+  data fields, contact chip, a DNA strip seeded by the holder's fields —
+  click it to switch between a double helix and the plain A/C/G/T letters —
+  machine-readable zone built from the fields).
 - **Text** — event badge: badge number, vertical role tag, title, two-line
   name, footer line. Citizen ID: issuer, SIN number, given names, surname, sex,
-  date of birth, expiry (both with a random-date die), district, status.
+  metatype (HUMAN, ELF, ORK…, with a random-metatype die), date of birth, expiry (both with a random-date die), district, status.
   Long text shrinks to fit its slot. The die button next to the badge number
   generates a random serial in one of 5 formats (`#92-0329`, `SIN-2950-0982`,
   `NZ-4085-Z`, `C4:16:F4:79`, `NMS/22137`).
