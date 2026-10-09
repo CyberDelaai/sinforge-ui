@@ -16,4 +16,6 @@ Items are removed from the list once they are implemented / resolved (no archive
 1. Add `sinforge_thumbnail.png` (1200×630) for the og:image / twitter:image social previews.
 2. Confirm the tagline (`tag` / `tag_alt` in `js/i18n.js`) — currently placeholder copy.
 3. Add SINFORGE to the logo tool-switcher menu in the sibling apps and flip its
-   card to "online" on the cyberdeck.tools landing page once it ships.
+   card to "online" on the cyberdeck.tools landing page once it ships (1.0.0).
+   Until then it's a hidden alpha card there (3 clicks to unlock) — see
+   "Alpha tools" in cyberdeck-tools/README.md for the flip steps.
