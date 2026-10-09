@@ -10,3 +10,4 @@ exclude:
   - bump_version.py
   - make_favicons.py
   - make_preview.py
+  - make_langs.py

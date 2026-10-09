@@ -200,10 +200,20 @@
   document.addEventListener('DOMContentLoaded', () => {
     const sel = $('uiLangSel');
     const saved = (() => { try { return localStorage.getItem('sinforge:lang'); } catch (e) { return null; } })();
-    const start = saved && I18N[saved] ? saved : 'en';
+    // A generated language page (/sinforge-ui/ru/ … — see make_langs.py) pins its language.
+    const urlLang = document.documentElement.getAttribute('data-url-lang');
+    const start = urlLang && I18N[urlLang] ? urlLang : saved && I18N[saved] ? saved : 'en';
     if (sel) {
       sel.value = start;
-      sel.addEventListener('change', () => SINFORGE.applyLang(sel.value));
+      sel.addEventListener('change', () => {
+        // Served over http(s): open that language's own URL (./ for EN, ./<lang>/
+        // otherwise — see make_langs.py) so the address matches the UI; on file://
+        // switch in place.
+        if (location.protocol === 'file:') return SINFORGE.applyLang(sel.value);
+        SINFORGE.save('sinforge:lang', sel.value);
+        const root = document.documentElement.hasAttribute('data-url-lang') ? '../' : './';
+        location.href = new URL(root + (sel.value === 'en' ? '' : sel.value + '/'), location.href).href;
+      });
     }
     SINFORGE.applyLang(start);
   });

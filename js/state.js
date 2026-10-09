@@ -7,7 +7,9 @@ SINFORGE.$ = (id) => document.getElementById(id);
 SINFORGE.const = {
   MAX_SOURCE: 2048,   // uploaded images are downscaled to this longest edge
   FONT: 'Quantico',   // the document typeface (Google Fonts, 400 + 700)
-  DOGGO: 'examples/cyber-doggo.webp', // default photo: the cyberdeck.tools mascot
+  // default photo: the cyberdeck.tools mascot (one folder up on a generated
+  // /<lang>/ page — see make_langs.py)
+  DOGGO: (document.documentElement.hasAttribute('data-url-lang') ? '../' : '') + 'examples/cyber-doggo.webp',
 };
 
 // Silent localStorage setter — blocked storage (private mode, file:// quirks)
