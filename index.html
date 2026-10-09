@@ -1,12 +1,12 @@
-<!-- SINFORGE v0.7.1 -->
+<!-- SINFORGE v0.7.2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SINFORGE — cyberdeck.tools</title>
-<meta name="description" content="SINFORGE is a free in-browser cyberpunk document constructor — ID cards, badges, keycards — from cyberdeck.tools. Runs entirely client-side — no backend, no build step." />
-<meta name="keywords" content="cyberpunk, sinforge, id card generator, badge maker, keycard, prop documents, ttrpg, larp, shadowrun, sin, gm tools, cyberdeck" />
+<title>SINFORGE — Cyberpunk ID Card, Badge &amp; Keycard Generator</title>
+<meta name="description" content="Free in-browser cyberpunk document generator: forge ID cards, SINs, event badges and keycards for TTRPG and LARP props. PNG export, no upload." />
+<meta name="keywords" content="cyberpunk, id card generator, cyberpunk id card, sin generator, badge maker, event badge, keycard, prop documents, ttrpg, larp, shadowrun, cyberpunk red, gm tools, png export" />
 <meta name="author" content="CyberDelaai" />
 <meta name="robots" content="index, follow" />
 <meta name="theme-color" content="#050507" />
@@ -19,17 +19,17 @@
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="SINFORGE" />
-<meta property="og:title" content="SINFORGE — cyberdeck.tools" />
-<meta property="og:description" content="A free in-browser cyberpunk document constructor: ID cards, badges, keycards. Runs entirely client-side." />
+<meta property="og:title" content="SINFORGE — Cyberpunk ID Card &amp; Badge Generator" />
+<meta property="og:description" content="Forge cyberpunk ID cards, SINs, event badges and keycards in your browser for TTRPG and LARP props. PNG export, nothing uploaded." />
 <meta property="og:url" content="https://cyberdeck.tools/sinforge-ui/" />
 <meta property="og:image" content="https://cyberdeck.tools/sinforge-ui/sinforge_thumbnail.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="SINFORGE — cyberdeck.tools preview" />
+<meta property="og:image:alt" content="SINFORGE — cyberpunk ID card and badge generator preview" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="SINFORGE — cyberdeck.tools" />
-<meta name="twitter:description" content="A free in-browser cyberpunk document constructor: ID cards, badges, keycards." />
+<meta name="twitter:title" content="SINFORGE — Cyberpunk ID Card &amp; Badge Generator" />
+<meta name="twitter:description" content="Forge cyberpunk ID cards, SINs, event badges and keycards in your browser. PNG export." />
 <meta name="twitter:image" content="https://cyberdeck.tools/sinforge-ui/sinforge_thumbnail.png" />
 
 <script type="application/ld+json">
@@ -37,11 +37,15 @@
   "@context": "https://schema.org",
   "@type": "WebApplication",
   "name": "SINFORGE",
-  "description": "A free in-browser cyberpunk document constructor — ID cards, badges, keycards — from cyberdeck.tools. Runs entirely client-side with no backend or build step.",
+  "alternateName": "SINFORGE Document Constructor",
+  "description": "Cyberpunk document constructor — forge in-game ID cards, SINs, event badges and keycards in the browser and export them as PNG. Useful for TTRPG game masters running Shadowrun or Cyberpunk RED and for LARP prop makers. Runs entirely client-side; images are never uploaded.",
   "applicationCategory": "DesignApplication",
+  "applicationSubCategory": "Document Generator",
   "operatingSystem": "Any (browser-based)",
   "browserRequirements": "Modern desktop browser",
   "url": "https://cyberdeck.tools/sinforge-ui/",
+  "keywords": "cyberpunk, id card generator, sin, badge maker, keycard, prop documents, ttrpg, larp, shadowrun, png export",
+  "isAccessibleForFree": true,
   "author": {
     "@type": "Person",
     "name": "CyberDelaai"
@@ -65,7 +69,7 @@
 <body>
 <div class="app">
   <header class="top">
-    <h1 class="sr-only">SINFORGE — cyberdeck.tools document constructor</h1>
+    <h1 class="sr-only">SINFORGE — cyberpunk ID card, badge and keycard generator with PNG export</h1>
     <div class="logo-menu">
       <button class="logo" id="logoBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="appMenu"><span class="chev" aria-hidden="true">&gt;</span> SINFORGE_</button>
       <nav class="app-menu" id="appMenu" data-augmented-ui="tl-clip br-clip border" aria-label="cyberdeck.tools navigation" hidden>
@@ -77,7 +81,7 @@
         <a class="app-menu-item current" href="https://cyberdeck.tools/sinforge-ui/" aria-current="page">&gt; SINFORGE_</a>
       </nav>
     </div>
-    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.7.1</span></span></div>
+    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">0.7.2</span></span></div>
     <select class="lang-select" id="uiLangSel" aria-label="interface language"><option value="en">EN</option><option value="ru">RU</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="it">IT</option><option value="ja">JP</option><option value="zh">CN</option></select>
   </header>
 
