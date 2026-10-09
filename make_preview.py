@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Render sinforge_thumbnail.png — the 1200x630 social/OG preview for SINFORGE.
+"""Render previews/og-<lang>.png — the 1200x630 social / og:image previews of
+SINFORGE, one per UI language.
 
-Same layout as EIDOLON's preview: dark grid background, "> SINFORGE" +
-cyberdeck.tools on the left, the artwork in the middle, the tagline on the
-right. The artwork is a real CITIZEN ID drawn by the app's own renderer
-(js/render.js + js/blanks.js) with the default document text and the doggo
-photo, so re-running after the blank changes keeps the preview in sync.
+Shared cyberdeck.tools layout: dark grid background, "> SINFORGE" +
+cyberdeck.tools on the left, the artwork in the middle, the translated tagline
+on the right. The artwork is real app output: the script loads the tool's own
+language page (./ or ./<lang>/, see make_langs.py) in a hidden frame, sets up
+its state, and catches the PNG the app's own export produces — so the preview
+follows the app (and its UI / calendar language) without hand edits.
 
-How: serves this folder on a local port (the photo effects read pixels, which
-needs http rather than file://), builds a page that loads the render modules,
-and screenshots it with headless Chrome/Edge. Fonts come from Google Fonts, so
-a network connection is needed.
+How: serves this folder on a local port and screenshots a layout page with
+headless Chrome/Edge, once per language. Fonts come from Google Fonts, so a
+network connection is needed. Run make_langs.py first (the language pages must
+exist), and re-run make_langs.py afterwards so every page points at its image.
 
 Usage:
-    python make_preview.py                  # writes sinforge_thumbnail.png
-    python make_preview.py --scheme night   # another colour scheme from js/state.js
-    python make_preview.py --html out.html  # also keep the HTML for tweaking
+    python make_preview.py              # all 8 languages
+    python make_preview.py ru de        # just these
+    python make_preview.py --html out.html   # also keep the layout page
 
 Browser lookup: $CHROME, then chrome/chromium/msedge on PATH, then the usual
 install locations on Windows / macOS.
@@ -23,6 +25,7 @@ install locations on Windows / macOS.
 import argparse
 import functools
 import http.server
+import json
 import os
 import shutil
 import subprocess
@@ -32,77 +35,158 @@ import threading
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-OUT = ROOT / "sinforge_thumbnail.png"
+OUT_DIR = ROOT / "previews"
 PAGE = "_preview.html"  # written into ROOT while rendering, then removed
 W, H = 1200, 630
-CARD_W = 440  # displayed card width; centred at x=620 so it clears the logo
+LANGS = ["en", "ru", "fr", "de", "es", "it", "ja", "zh"]
 
-# render.js needs these, in index.html order (app.js / i18n.js / header.js are UI only)
-MODULES = ["state", "render", "frames", "codes", "chips", "dates", "blanks"]
+# ---- per-tool setup -----------------------------------------------------------
+NAME = 'SINFORGE'
+GLOW = '#ff1a2e'          # artwork halo colour
+TILT = -5                # artwork rotation, degrees
+ART_W, ART_H = 440, 300  # artwork box (px); the export is scaled to fit
+# right-hand tagline per language: two big lines + a small one
+TAGLINES = {
+    'en': ('ID CARD', 'MAKER', 'for TTRPG / LARP'),
+    'ru': ('ГЕНЕРАТОР', 'УДОСТОВЕРЕНИЙ', 'для НРИ и LARP'),
+    'fr': ('CARTES', "D'IDENTITÉ", 'pour JDR et GN'),
+    'de': ('AUSWEIS-', 'GENERATOR', 'für Pen & Paper / LARP'),
+    'es': ('CARNÉS DE', 'IDENTIDAD', 'para rol y LARP'),
+    'it': ('CARTE', "D'IDENTITÀ", 'per GDR e LARP'),
+    'ja': ('IDカード', 'メーカー', 'TRPG・LARP向け'),
+    'zh': ('身份证', '生成器', '适用于跑团与 LARP'),
+}
+# JS run in the layout page before the app loads (LANG = language code)
+SETUP_JS = """// the CITIZEN ID blank, full-colour doggo photo (the default halftone muddies
+  // at thumbnail size), and a metatype that admits it's a dog. kinda.
+  localStorage.setItem('sinforge:blank', 'citizen-id');
+  localStorage.setItem('sinforge:style', JSON.stringify({ photoFx: 'none' }));
+  localStorage.setItem('sinforge:doc', JSON.stringify({ metatype: 'HUMAN?' }));
+  localStorage.setItem('sinforge:out', JSON.stringify({ scale: 1 }));"""
+# JS expression polled until true (w / d = the app frame's window / document)
+READY_JS = """w.SINFORGE && w.SINFORGE.state.photo && d.fonts.status === 'loaded'"""
+# JS that triggers the app's own PNG export
+EXPORT_JS = """d.getElementById('exportBtn').click();"""
+# -------------------------------------------------------------------------------
 
 
-def build_html(scheme):
-    scripts = "\n".join(f'<script src="js/{m}.js"></script>' for m in MODULES)
-    return f"""<!DOCTYPE html>
+def build_html():
+    taglines = json.dumps(TAGLINES, ensure_ascii=False)
+    return (TEMPLATE
+            .replace("%NAME%", NAME)
+            .replace("%TAGLINES%", taglines)
+            .replace("%SETUP%", SETUP_JS)
+            .replace("%READY%", READY_JS)
+            .replace("%EXPORT%", EXPORT_JS)
+            .replace("%GLOW%", GLOW)
+            .replace("%TILT%", str(TILT))
+            .replace("%ART_W%", str(ART_W))
+            .replace("%ART_H%", str(ART_H)))
+
+
+TEMPLATE = r"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8" />
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Quantico:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet" />
 <style>
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  html, body {{ width: {W}px; height: {H}px; overflow: hidden; }}
-  body {{
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
     position: relative;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'Noto Sans JP', monospace;
     background-color: #0a0c10;
-    /* 40px grid, same pitch / phase / tint as EIDOLON's preview */
+    /* 40px grid, same pitch / phase / tint across every tool's preview */
     background-image:
       linear-gradient(to right, rgba(0, 233, 255, 0.07) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(0, 233, 255, 0.07) 1px, transparent 1px);
     background-size: 40px 40px;
     background-position: 23px 35px;
-  }}
-  .left {{ position: absolute; left: 65px; top: 255px; }}
-  .logo {{ color: #ffe500; font-weight: 700; font-size: 46px; line-height: 1; letter-spacing: 1px; }}
-  .site {{ color: #8a97a3; font-size: 19px; margin-top: 30px; }}
-  .right {{ position: absolute; right: 65px; top: 255px; text-align: right; }}
-  .tag {{ color: #00e9ff; font-weight: 700; font-size: 34px; line-height: 50px; letter-spacing: 1px; }}
-  .sub {{ color: #8a97a3; font-size: 19px; margin-top: 14px; }}
-  #card {{
-    position: absolute; left: 620px; top: 50%; width: {CARD_W}px;
-    transform: translate(-50%, -50%) rotate(-5deg);
-    filter: drop-shadow(0 0 22px var(--glow)) drop-shadow(0 0 4px var(--glow));
-  }}
+  }
+  body.zh { font-family: 'JetBrains Mono', 'Noto Sans SC', monospace; }
+  .left { position: absolute; left: 65px; top: 255px; }
+  .logo { color: #ffe500; font-weight: 700; font-size: 46px; line-height: 1; letter-spacing: 1px; white-space: nowrap; }
+  .site { color: #8a97a3; font-size: 19px; margin-top: 30px; }
+  .right { position: absolute; right: 65px; top: 50%; transform: translateY(-50%); text-align: right; width: 290px; }
+  .tag { color: #00e9ff; font-weight: 700; font-size: 34px; line-height: 1.45; letter-spacing: 1px; white-space: nowrap; }
+  .sub { color: #8a97a3; font-size: 19px; margin-top: 14px; white-space: nowrap; }
+  /* Japanese / Chinese: the tagline is set vertically, columns right to left */
+  body.ja .right, body.zh .right {
+    writing-mode: vertical-rl; text-orientation: mixed;
+    top: 95px; right: 80px; transform: none; width: auto; height: 440px; text-align: center;
+  }
+  /* CJK font first: its vertical forms turn ー, 、 and brackets upright */
+  body.ja .right { font-family: 'Noto Sans JP', 'JetBrains Mono', sans-serif; }
+  body.zh .right { font-family: 'Noto Sans SC', 'JetBrains Mono', sans-serif; }
+  body.ja .tag, body.zh .tag { font-size: 42px; line-height: 1.3; letter-spacing: 6px; }
+  body.ja .tcy, body.zh .tcy { text-combine-upright: all; }
+  body.ja .sub, body.zh .sub { font-size: 20px; letter-spacing: 3px; margin: 0 22px 0 0; }
+  #art {
+    position: absolute; left: 620px; top: 50%;
+    transform: translate(-50%, -50%) rotate(%TILT%deg);
+    filter: drop-shadow(0 0 22px %GLOW%) drop-shadow(0 0 4px %GLOW%);
+  }
+  #frame { position: absolute; left: -5000px; top: 0; width: 1440px; height: 1000px; border: 0; }
 </style>
-{scripts}
 </head><body>
-  <div class="left"><div class="logo">&gt; SINFORGE</div><div class="site">cyberdeck.tools</div></div>
-  <div class="right"><div class="tag">ID CARD</div><div class="tag">MAKER</div><div class="sub">for TTRPG / LARP</div></div>
-  <canvas id="card"></canvas>
+  <div class="left"><div class="logo">&gt; %NAME%</div><div class="site">cyberdeck.tools</div></div>
+  <div class="right"><div class="tag" id="t1"></div><div class="tag" id="t2"></div><div class="sub" id="t3"></div></div>
+  <img id="art" alt="" />
 <script>
-(async () => {{
-  const S = SINFORGE.state;
-  S.blank = 'citizen-id';
-  Object.assign(S.style, SINFORGE.schemes[{scheme!r}]);
-  S.style.photoFx = 'none'; // full-colour photo: the default halftone muddies at thumbnail size
-  S.doc.metatype = 'HUMAN?'; // it's a dog. kinda.
-  document.body.style.setProperty('--glow', S.style.accent);
+(async () => {
+  const LANG = new URLSearchParams(location.search).get('lang') || 'en';
+  const TAG = %TAGLINES%[LANG];
+  document.body.classList.add(LANG);
+  document.documentElement.lang = LANG;
+  ['t1', 't2', 't3'].forEach((id, i) => { document.getElementById(id).textContent = TAG[i]; });
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const img = new Image();
-  img.src = SINFORGE.const.DOGGO;
-  await img.decode();
-  const src = document.createElement('canvas');
-  src.width = img.naturalWidth; src.height = img.naturalHeight;
-  src.getContext('2d').drawImage(img, 0, 0);
-  src.__id = 1; // photo-layer cache key in render.js
-  S.photo = src;
+  // per-tool state, written before the app loads (same origin = same storage)
+  %SETUP%
 
-  await Promise.all(['700 64px Quantico', '400 44px Quantico'].map((f) => document.fonts.load(f)));
-  // drawn at 2x the displayed width, so thin rules survive the downscale
-  const k = ({CARD_W} * 2) / SINFORGE.blanks[S.blank].w;
-  const c = document.getElementById('card');
-  const r = SINFORGE.renderCanvas(k);
-  c.width = r.width; c.height = r.height;
-  c.getContext('2d').drawImage(r, 0, 0);
-}})();
+  const frame = document.createElement('iframe');
+  frame.id = 'frame';
+  frame.src = LANG === 'en' ? './' : './' + LANG + '/';
+  document.body.appendChild(frame);
+  await new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  const w = frame.contentWindow, d = frame.contentDocument;
+  // Chrome pauses requestAnimationFrame in a frame it isn't painting (this one
+  // is off-screen), which stalls exports that wait a frame: run rAF on a timer.
+  w.requestAnimationFrame = (cb) => w.setTimeout(() => cb(w.performance.now()), 16);
+  for (let i = 0; i < 200 && !(%READY%); i++) await sleep(100);
+  await sleep(600); // let the last render / font swap settle
+
+  // Catch the app's download instead of saving it: its export clicks an
+  // <a download> — resolve with that href (and keep blob: URLs alive).
+  const href = await new Promise((resolve) => {
+    w.URL.revokeObjectURL = () => {};
+    const click = w.HTMLAnchorElement.prototype.click;
+    w.HTMLAnchorElement.prototype.click = function () {
+      if (this.download) return resolve(this.href);
+      return click.call(this);
+    };
+    %EXPORT%
+  });
+
+  const art = document.getElementById('art');
+  await new Promise((r) => { art.onload = r; art.src = href; });
+  const k = Math.min(%ART_W% / art.naturalWidth, %ART_H% / art.naturalHeight);
+  art.style.width = Math.round(art.naturalWidth * k) + 'px';
+  art.style.height = Math.round(art.naturalHeight * k) + 'px';
+
+  // shrink a tagline line that would overflow its column (long words, CJK)
+  await document.fonts.ready;
+  const vertical = LANG === 'ja' || LANG === 'zh';
+  // vertical CJK: set short Latin / digit runs (ID, 2D…) upright side by side
+  // (tate-chu-yoko) in the big lines; longer words like TRPG stay rotated
+  if (vertical) document.querySelectorAll('.tag').forEach((el) => {
+    el.innerHTML = el.textContent.replace(/(?<![A-Za-z0-9])[A-Za-z0-9]{1,2}(?![A-Za-z0-9])/g, '<span class="tcy">$&</span>');
+  });
+  document.querySelectorAll('.tag, .sub').forEach((el) => {
+    let px = parseFloat(getComputedStyle(el).fontSize);
+    const over = () => (vertical ? el.scrollHeight > 440 : el.scrollWidth > 290);
+    while (over() && px > 12) el.style.fontSize = (px -= 1) + 'px';
+  });
+  frame.remove();
+})();
 </script>
 </body></html>
 """
@@ -127,34 +211,41 @@ def find_browser():
     sys.exit("No Chrome/Edge found — set $CHROME to a Chromium-based browser.")
 
 
-def render(page_html, out):
+def render(langs, page_html):
     browser = find_browser()
+
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *a):
             pass
-    handler = functools.partial(Quiet, directory=str(ROOT))
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(ROOT)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     page = ROOT / PAGE
     page.write_text(page_html, encoding="utf-8")
+    OUT_DIR.mkdir(exist_ok=True)
+    from PIL import Image
     try:
-        with tempfile.TemporaryDirectory() as tmp:
-            shot = Path(tmp) / "shot.png"
-            subprocess.run([
-                browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                "--force-device-scale-factor=1", f"--window-size={W},{H}",
-                "--virtual-time-budget=10000",  # fonts + photo + render before the shot
-                f"--user-data-dir={Path(tmp) / 'profile'}",
-                f"--screenshot={shot}", f"http://127.0.0.1:{server.server_port}/{PAGE}",
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            # Headless may hand back a slightly different canvas — normalise to WxH.
-            from PIL import Image
-            img = Image.open(shot).convert("RGB")
-            if img.size != (W, H):
-                canvas = Image.new("RGB", (W, H), (10, 12, 16))
-                canvas.paste(img.crop((0, 0, min(W, img.width), min(H, img.height))))
-                img = canvas
-            img.save(out, optimize=True)
+        for lang in langs:
+            if lang != "en" and not (ROOT / lang / "index.html").exists():
+                print(f"skip {lang}: {lang}/index.html missing — run make_langs.py first")
+                continue
+            with tempfile.TemporaryDirectory() as tmp:
+                shot = Path(tmp) / "shot.png"
+                subprocess.run([
+                    browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
+                    "--force-device-scale-factor=1", f"--window-size={W},{H}",
+                    "--virtual-time-budget=25000",  # app load + export + fonts before the shot
+                    f"--user-data-dir={Path(tmp) / 'profile'}",  # fresh storage every run
+                    f"--screenshot={shot}", f"http://127.0.0.1:{server.server_port}/{PAGE}?lang={lang}",
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                img = Image.open(shot).convert("RGB")
+                if img.size != (W, H):  # headless may hand back a slightly different canvas
+                    canvas = Image.new("RGB", (W, H), (10, 12, 16))
+                    canvas.paste(img.crop((0, 0, min(W, img.width), min(H, img.height))))
+                    img = canvas
+                out = OUT_DIR / f"og-{lang}.png"
+                img.save(out, optimize=True)
+                print(f"wrote previews/{out.name}")
     finally:
         page.unlink(missing_ok=True)
         server.shutdown()
@@ -162,16 +253,16 @@ def render(page_html, out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", type=Path, default=OUT, help=f"output PNG (default: {OUT.name})")
-    ap.add_argument("--html", type=Path, help="also write the generated HTML here")
-    ap.add_argument("--scheme", default="paper", help="colour scheme key from js/state.js (default: paper)")
+    ap.add_argument("langs", nargs="*", help="languages to render (default: all)")
+    ap.add_argument("--html", type=Path, help="also write the layout page here")
     args = ap.parse_args()
-
-    page = build_html(args.scheme)
+    bad = [l for l in args.langs if l not in LANGS]
+    if bad:
+        sys.exit(f"unknown language(s): {', '.join(bad)} — use {', '.join(LANGS)}")
+    page = build_html()
     if args.html:
         args.html.write_text(page, encoding="utf-8")
-    render(page, args.out)
-    print(f"wrote {args.out}")
+    render(args.langs or LANGS, page)
 
 
 if __name__ == "__main__":
