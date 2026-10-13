@@ -210,10 +210,11 @@
 
   /* ---------- Center working area ---------- */
   /* sized to the viewport, not to the side columns: as they grow taller the
-     preview stays put (sticky) instead of stretching and drifting down */
+     preview stays put (sticky) instead of stretching and drifting down; sticky
+     makes it a stacking layer, raised so its windows float over the right column */
   .workspace {
     flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;
-    align-self: flex-start; position: sticky; top: 16px;
+    align-self: flex-start; position: sticky; top: 16px; z-index: 2;
   }
   .stage {
     height: max(440px, calc(100vh - 286px)); position: relative;
@@ -426,6 +427,41 @@
   .fill-swatch:hover { --aug-border-bg: var(--main); }
   .fill-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+  /* colour grid (COMMLINK's accent picker): preset swatches, the last picked
+     custom colour and the picker button in a clipped group */
+  .color-grid { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .color-grid .grid-break { flex-basis: 100%; height: 0; } /* force a new swatch row */
+  .custom-color-group {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 4px;
+    --aug-border-all: 1px; --aug-border-bg: rgba(0, 240, 255, 0.45);
+    --aug-inlay-all: 0px; --aug-tl: 8px; --aug-br: 8px;
+  }
+  .swatch {
+    width: 28px; height: 28px; padding: 0; border: 1px solid var(--dim);
+    cursor: pointer; transition: transform 0.1s, border-color 0.1s;
+  }
+  .swatch:hover { transform: scale(1.1); }
+  .swatch.active { border-color: #fff; box-shadow: 0 0 8px currentColor; }
+  .swatch-night { background: radial-gradient(ellipse at 50% 45%, #0a0d16 0%, #030307 70%); color: var(--cyan); }
+  .swatch-saved {
+    border: none !important;
+    --aug-border-all: 1px; --aug-border-bg: var(--dim); --aug-inlay-all: 0px; --aug-tl: 7px;
+  }
+  .swatch-saved.active { --aug-border-bg: #fff; }
+  .swatch-pick-btn {
+    position: relative; width: 28px; height: 28px; margin: 0; padding: 0;
+    color: var(--cyan); cursor: pointer; display: inline-block; background: transparent;
+    transition: background 0.15s;
+    --aug-border-all: 1px; --aug-border-bg: var(--cyan); --aug-inlay-all: 0px; --aug-br: 7px;
+  }
+  .swatch-pick-btn:hover { background: rgba(0, 240, 255, 0.18); }
+  .swatch-pick-btn .pick-icon { position: absolute; inset: 0; margin: auto; width: 18px; height: 18px; pointer-events: none; }
+  .swatch-pick-btn input[type="color"] {
+    position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: none; padding: 0;
+  }
+  .digi-field { margin-top: 14px; }
+  .digi-field.disabled { opacity: .4; pointer-events: none; }
+
   /* rotation wheel: the needle points where the rotated content runs */
   .dial {
     --angle: 0deg;
@@ -512,9 +548,10 @@
   .stage-tool[aria-expanded="true"] {
     color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.45);
   }
-  /* DIGITAL mode toggle: the stage's top-right icon (an on/off, not a window) */
+  /* DIGITAL mode: the stage's top-right icon opens its window (on/off +
+     backdrop); .is-on lights it while the mode is on */
   .stage-tool-r { left: auto; right: 8px; }
-  .stage-tool[aria-pressed="true"] {
+  .stage-tool.is-on {
     color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.45);
   }
 
@@ -526,7 +563,7 @@
   .digi-bg { display: none; }
   .stage.digital {
     padding: 34px 24px 58px; border-style: solid; border-color: rgba(var(--digi-rgb),0.35);
-    background: radial-gradient(ellipse at 50% 45%, #0a0d16 0%, #030307 70%);
+    background: radial-gradient(ellipse at 50% 45%, var(--digi-bg0, #0a0d16) 0%, var(--digi-bg1, #030307) 70%);
   }
   .stage.digital .digi-bg { display: block; position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none; }
   .stage.digital .doc-canvas { filter: drop-shadow(0 0 10px rgba(var(--digi-rgb),0.45)) drop-shadow(0 0 28px rgba(var(--digi-rgb),0.18)); }
@@ -537,6 +574,8 @@
     box-shadow: 0 0 30px rgba(0,0,0,0.6);
   }
   .adj-pop[hidden] { display: none; }
+  /* the DIGITAL window opens from the right edge: floats over the right column */
+  .adj-pop-r { right: auto; left: calc(100% + 22px); }
   .modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .modal-head h2 { margin: 0; color: var(--accent); }
   .adj-close {
@@ -549,4 +588,5 @@
     .config-col { width: 100%; }
     /* no column beside the stage: drop the window inside it, under the icons */
     .config.adj-pop { top: 134px; right: auto; left: 8px; width: min(340px, calc(100% - 16px)); }
+    .config.adj-pop-r { top: 50px; left: auto; right: 8px; }
   }

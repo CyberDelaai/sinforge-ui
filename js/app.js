@@ -1093,7 +1093,8 @@
 
   // ---- EFFECTS / WATERMARK / PHOTO FX windows: the stage's top-left icons open them
   // (one at a time), floating over the column to the left of the canvas
-  // (EIDOLON's COLOUR window). An icon names its window in aria-controls. ----
+  // (EIDOLON's COLOUR window); the top-right icon opens the DIGITAL window over
+  // the column to the right. An icon names its window in aria-controls. ----
   function setPopOpen(pop) {
     document.querySelectorAll('.stage-tool[aria-controls]').forEach((btn) => {
       const on = btn.getAttribute('aria-controls') === (pop && pop.id);

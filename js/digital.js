@@ -7,7 +7,9 @@
   // scene, painted by the same code on the stage (the backdrop canvas behind
   // the card) and in the PNG: compose(card) paints it around the card
   // the renderer drew — the renderer itself never knows about the mode. The
-  // on/off flag is S.out.digital. ----
+  // on/off flag is S.out.digital; the backdrop colour S.style.digiBg /
+  // digiColor (both set in the DIGITAL window the stage's top-right icon opens,
+  // from its colour grid). ----
   const $ = SINFORGE.$;
   const t = SINFORGE.t;
   const S = SINFORGE.state;
@@ -26,10 +28,21 @@
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
   const luma = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
-  // The scene's colour follows the card: its accent, else its ink, when bright
-  // enough to read on the dark backdrop; the app's cyan otherwise. As "r,g,b".
+  const hex = (c) => '#' + c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+  // The backdrop: a radial gradient, [centre, edge] — the dark night, or the
+  // user's colour (S.style.digiBg / digiColor) fading to a darker shade of it.
+  function bgColors() {
+    const c = S.style.digiColor;
+    if (S.style.digiBg !== 'custom' || !/^#[0-9a-f]{6}$/i.test(c)) return ['#0a0d16', '#030307'];
+    return [c, hex(rgb(c).map((v) => v * 0.45))];
+  }
+  // The scene's colour follows the card: its accent, else its ink, when it
+  // stands out from the backdrop (lighter on a dark one, darker on a light
+  // one); the app's cyan / a near-black otherwise. As "r,g,b".
   function tintOf() {
-    const c = [S.style.accent, S.style.ink].find((h) => /^#[0-9a-f]{6}$/i.test(h) && luma(rgb(h)) >= 70) || CYAN;
+    const bl = luma(rgb(bgColors()[0])), dark = bl < 128;
+    const ok = (h) => /^#[0-9a-f]{6}$/i.test(h) && (dark ? luma(rgb(h)) >= Math.max(70, bl + 60) : luma(rgb(h)) <= bl - 70);
+    const c = [S.style.accent, S.style.ink].find(ok) || (dark ? CYAN : '#0a0d16');
     return rgb(c).join(',');
   }
   // the active blank's outline bounds, as fractions of the card canvas (the
@@ -178,7 +191,10 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     const sc = scene(ctx, W, H, STAGE_U);
+    const [bg0, bg1] = bgColors();
     stage.style.setProperty('--digi-rgb', sc.rgb);
+    stage.style.setProperty('--digi-bg0', bg0);
+    stage.style.setProperty('--digi-bg1', bg1);
     drawBackdrop(sc);
     const b = stageCard();
     if (b) drawOverlay(sc, b);
@@ -204,8 +220,9 @@
     out.width = W; out.height = H;
     const ctx = out.getContext('2d');
     const bg = ctx.createRadialGradient(W / 2, H * 0.45, 0, W / 2, H * 0.45, Math.hypot(W, H) * 0.5);
-    bg.addColorStop(0, '#0a0d16');
-    bg.addColorStop(1, '#030307');
+    const [bg0, bg1] = bgColors();
+    bg.addColorStop(0, bg0);
+    bg.addColorStop(1, bg1);
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
     const sc = scene(ctx, W, H, u);
@@ -227,6 +244,40 @@
     return out;
   }
 
+  // ---- the backdrop colour grid (COMMLINK's accent picker): the night swatch
+  // ('auto'), presets, the custom swatch (S.style.digiCustom: pre-picked, then
+  // the last colour picked) and the
+  // picker. The colour never reaches the renderer: save + repaint the scene. ----
+  function syncColors() {
+    // a saved '' (from before the swatch was pre-picked) falls back to the default
+    if (!/^#[0-9a-f]{6}$/i.test(S.style.digiCustom)) S.style.digiCustom = SINFORGE.newStyle().digiCustom;
+    const grid = $('digiColors'), saved = grid.querySelector('[data-saved]'), c = S.style.digiCustom;
+    saved.dataset.color = c;
+    saved.style.background = c;
+    saved.style.color = c;
+    saved.setAttribute('aria-label', c);
+    $('digiPick').value = c;
+    const cur = S.style.digiBg === 'custom' ? S.style.digiColor : 'auto';
+    grid.querySelectorAll('.swatch').forEach((sw) => sw.classList.toggle('active', sw.dataset.color === cur));
+  }
+  function setBg(c) {
+    if (c === 'auto') S.style.digiBg = 'auto';
+    else { S.style.digiBg = 'custom'; S.style.digiColor = c; }
+    SINFORGE.save('sinforge:style', JSON.stringify(S.style));
+    syncColors();
+    schedule();
+  }
+  function bindColors() {
+    $('digiColors').addEventListener('click', (e) => {
+      const sw = e.target.closest('.swatch');
+      if (sw && sw.dataset.color) setBg(sw.dataset.color);
+    });
+    $('digiPick').addEventListener('input', (e) => {
+      S.style.digiCustom = e.target.value;
+      setBg(e.target.value);
+    });
+  }
+
   // ---- public ----
   SINFORGE.digital = {
     compose,
@@ -235,7 +286,10 @@
       S.out.digital = !!on;
       SINFORGE.save('sinforge:out', JSON.stringify(S.out));
       stage.classList.toggle('digital', S.out.digital);
-      $('digiBtn').setAttribute('aria-pressed', String(S.out.digital));
+      $('digiBtn').classList.toggle('is-on', S.out.digital);
+      $('digiSwitch').dataset.pos = S.out.digital ? 'right' : 'left';
+      document.querySelectorAll('.digi-needs').forEach((el) => el.classList.toggle('disabled', !S.out.digital));
+      syncColors();
       document.dispatchEvent(new CustomEvent('sinforge:digital'));
       schedule();
     },
@@ -243,10 +297,13 @@
     sync: schedule,
     init() {
       stage = $('stage'); doc = $('docCanvas'); cv = $('digiBg');
-      $('digiBtn').addEventListener('click', () => SINFORGE.digital.set(!S.out.digital));
+      // the top-right icon opens the DIGITAL window (app.js's bindPops); its
+      // switch turns the mode on / off
+      $('digiSwitch').addEventListener('click', () => SINFORGE.digital.set(!S.out.digital));
+      bindColors();
       if (window.ResizeObserver) new ResizeObserver(schedule).observe(stage);
       document.addEventListener('sinforge:lang', schedule);
-      if (S.out.digital) SINFORGE.digital.set(true);
+      SINFORGE.digital.set(S.out.digital);
     },
   };
 })(window.SINFORGE);

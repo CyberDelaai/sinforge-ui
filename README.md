@@ -70,7 +70,12 @@ client-side; your images are never uploaded.
   multiply on light cards, screen (lighten) on dark ones.
   It marks the card background only: every element sits on top of it and the
   photo window stays clean.
-- **DIGITAL mode** — the icon at the stage's top-right corner shows the card
+- **DIGITAL mode** — the icon at the stage's top-right corner opens the
+  DIGITAL window: switch the mode on / off and pick the backdrop from a colour
+  grid like COMMLINK's accent picker — the default night, dark and soft
+  presets, or a custom colour (its swatch starts pre-picked; the picker
+  beside it replaces it with the last colour picked) (the scene's tint adapts so it stays
+  readable on light colours too). The mode shows the card
   as a digital document shared from a device over the air: a matrix grid
   behind it (glyph columns, a grid, a perspective floor, motes), a glow and holo brackets around
   the card and a wireless HUD: the emitter's readout and the log of a finished

@@ -90,6 +90,11 @@ SINFORGE.newStyle = () => ({
   glow: false, glowAmt: 40,   // neon halo around the card (accent colour)
   grain: false, grainAmt: 25, // print grain, %
   scan: false, scanAmt: 25,   // scanlines, %
+  // DIGITAL mode backdrop (js/digital.js): 'auto' (the dark night) | 'custom'
+  // (then digiColor — a preset swatch or a picked colour)
+  digiBg: 'auto',
+  digiColor: '#1a0b2e',
+  digiCustom: '#2b1055', // the picker's swatch: pre-picked, then the last colour picked
 });
 
 // Default name-generator settings (js/names.js). `key` is the user's own
