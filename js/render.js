@@ -186,6 +186,83 @@
     });
   };
 
+  // A license icon (js/licenses.js) as a canvas at device pixels, in one colour;
+  // `cut` shapes knock out of the icon only (never the card under it). A custom
+  // icon (S.licIcons[key], an alpha mask) is fitted into the square and filled
+  // with the colour instead. Cached by key, colour, size and custom mask.
+  const iconCache = new Map();
+  function licenseIcon(key, color, px) {
+    const mask = S.licIcons[key];
+    const id = key + '|' + color + '|' + px + '|' + (mask ? mask.__id : '');
+    if (iconCache.has(id)) return iconCache.get(id);
+    const c = document.createElement('canvas');
+    c.width = c.height = px;
+    const x = c.getContext('2d');
+    if (mask) {
+      const f = px / Math.max(mask.width, mask.height), w = mask.width * f, h = mask.height * f;
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(mask, (px - w) / 2, (px - h) / 2, w, h);
+      x.globalCompositeOperation = 'source-in';
+      x.fillStyle = color;
+      x.fillRect(0, 0, px, px);
+      if (iconCache.size > 96) iconCache.clear();
+      iconCache.set(id, c);
+      return c;
+    }
+    x.scale(px / 100, px / 100);
+    x.fillStyle = x.strokeStyle = color;
+    x.lineJoin = 'miter'; x.lineCap = 'butt';
+    SINFORGE.licenses[key].shapes().forEach((sh) => {
+      x.globalCompositeOperation = sh.cut ? 'destination-out' : 'source-over';
+      x.beginPath();
+      if (sh.c || sh.ring) { const [cx, cy, r] = sh.c || sh.ring; x.arc(cx, cy, r, 0, Math.PI * 2); }
+      else (sh.p || sh.l).forEach(([px, py], i) => x[i ? 'lineTo' : 'moveTo'](px, py));
+      if (sh.p) { x.closePath(); x.fill(); }
+      else if (sh.c) x.fill();
+      else { x.lineWidth = sh.w || 6; x.stroke(); }
+    });
+    if (iconCache.size > 96) iconCache.clear();
+    iconCache.set(id, c);
+    return c;
+  }
+
+  // One license tile in `box`: granted (`on`) it is a solid ink plate with the
+  // icon + caption in the card colour and an accent corner; not granted, an
+  // ink outline with the icon + caption faded. A custom caption
+  // (S.doc.licCaps[key]) replaces the built-in one. The box (+ key) is added to
+  // gfx.licenseBoxes (native px) for the stage's click target.
+  gfx.license = function license(ctx, k, box, key, on, st) {
+    const def = SINFORGE.licenses[key];
+    if (!def) return;
+    const cap = (S.doc.licCaps[key] || def.cap).trim();
+    gfx.licenseBoxes.push({ x: box.x, y: box.y, w: box.w, h: box.h, key });
+    const { x, y, w, h } = box, cut = w * 0.12;
+    const plate = [[x + cut, y], [x + w, y], [x + w, y + h - cut], [x + w - cut, y + h], [x, y + h], [x, y + cut]];
+    ctx.save();
+    if (on) {
+      gfx.poly(ctx, plate);
+      ctx.fillStyle = st.ink;
+      ctx.fill();
+      gfx.poly(ctx, [[x + w - w * 0.2, y], [x + w, y], [x + w, y + w * 0.2]]);
+      ctx.fillStyle = st.accent;
+      ctx.fill();
+    } else {
+      gfx.poly(ctx, gfx.inset(plate, 1.5));
+      ctx.strokeStyle = st.ink; ctx.lineWidth = 3; ctx.lineJoin = 'miter';
+      ctx.stroke();
+      ctx.globalAlpha = 0.28;
+    }
+    const color = on ? st.card : st.ink;
+    const s = w * 0.56, ix = x + (w - s) / 2, iy = y + h * 0.1;
+    ctx.drawImage(licenseIcon(key, color, Math.max(8, Math.round(s * k))), ix, iy, s, s);
+    // caption centred under the icon
+    const size = gfx.fitFont(ctx, cap, 700, Math.round(w * 0.14), w - 16, 0.04);
+    const cw = ctx.measureText(cap).width;
+    gfx.text(ctx, cap, x + (w - cw) / 2, y + h - h * 0.1, { size, maxW: w - 16, color, spacing: 0.04 });
+    ctx.restore();
+  };
+  gfx.licenseBoxes = [];
+
   // ---- photo: the source picture framed into a box, then the photo effect.
   // Mono / halftone / dither turn it into pure ink on transparent, so the card
   // colour shows through the light parts. Cached by its inputs: the processing
@@ -463,6 +540,7 @@
     gfx.dnaBox = null;  // set by a blank that draws a DNA strip (its click target)
     gfx.chipBox = null; // set by gfx.chip
     gfx.dateBoxes = []; // filled by gfx.date
+    gfx.licenseBoxes = []; // filled by gfx.license
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });
 
     if (st.grain) {

@@ -141,6 +141,7 @@
           <canvas id="docCanvas" class="doc-canvas" aria-label="document preview"></canvas>
           <!-- hover marker over the photo window / barcode (preview only, outside the renderer) -->
           <svg class="photo-hover" id="photoHover" aria-hidden="true"><polygon /></svg>
+          <button class="lic-pen stage-pen" id="licPenStage" type="button" data-i18n-title="b_licedit" hidden></button>
         </div>
         <!-- portrait frame picker: opens on a click on the photo, beside the click -->
         <div class="frame-pop config" id="framePop" role="dialog" aria-labelledby="frameTitle" data-augmented-ui="tl-clip br-clip border" hidden>
@@ -279,6 +280,28 @@
 </div>
 
 <!-- toast: every status message pops up here (bottom centre), above the panels -->
+<!-- crop window for custom license icons (js/crop.js) -->
+<div class="modal-overlay" id="cropModal" hidden>
+  <div class="config crop-box" role="dialog" aria-modal="true" aria-labelledby="cropTitle" data-augmented-ui="tl-clip br-clip border">
+    <h2 id="cropTitle">// <span data-i18n="h_crop">CROP ICON</span></h2>
+    <div class="crop-stage" id="cropStage">
+      <canvas id="cropCanvas"></canvas>
+      <div class="crop-frame" id="cropFrame">
+        <svg class="crop-guide" id="cropGuide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="crop-handle" id="cropHandle"></div>
+      </div>
+    </div>
+    <p class="hint mt" data-i18n="hint_crop">Keep the icon inside the dashed square: that's the size the built-in icons print at. Drag to move, the corner or the wheel to resize.</p>
+    <div class="crop-actions">
+      <button class="btn btn-sm btn-alt" id="cropFit" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_fit" data-i18n-title="t_fit" title="Fit the icon to the guides">FIT</button>
+      <button class="btn btn-sm btn-alt" id="cropMax" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_max" data-i18n-title="t_max" title="Select the whole image">MAX</button>
+      <span class="crop-gap"></span>
+      <button class="btn btn-sm" id="cropUse" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_use">USE</button>
+      <button class="btn btn-sm btn-alt" id="cropCancel" type="button" data-augmented-ui="tl-clip br-clip border" data-i18n="b_cancel">CANCEL</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite" data-augmented-ui="tl-clip br-clip border"></div>
 
 <div class="footer-stamp" aria-hidden="true">SINFORGE (c) // 2026 // CYBERDELAAI // MIT</div>
@@ -292,6 +315,8 @@
 <script defer src="js/codes.js"></script>
 <script defer src="js/chips.js"></script>
 <script defer src="js/dates.js"></script>
+<script defer src="js/licenses.js"></script>
+<script defer src="js/crop.js"></script>
 <script defer src="js/blanks.js"></script>
 <script defer src="js/names.js"></script>
 <script defer src="js/app.js"></script>

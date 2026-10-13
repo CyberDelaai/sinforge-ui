@@ -70,6 +70,18 @@
   // outer edge lines up with the issuer band and the MRZ rule.
   const idPortrait = (b) => ({ box: { x: 157, y: 220, w: 413, h: b - 220 }, cut: 60, line: 14 });
 
+  const LIC_OUTLINE = [
+    [60, 130], [140, 50], [1060, 50], [1090, 80], [1460, 80], [1540, 160],
+    [1540, 560], [1515, 585], [1515, 745], [1540, 770],
+    [1540, 880], [1460, 960], [640, 960], [610, 930], [140, 930], [60, 850],
+  ];
+  // The license card's photo ends above the barcode, or runs on down to the
+  // license grid's bottom edge (LIC_BOTTOM) when the barcode is off.
+  const LIC_BOTTOM = 884, LIC_CODE_TOP = 752;
+  const licPortrait = (st) => ({
+    box: { x: 157, y: 230, w: 380, h: (st.barcode ? LIC_CODE_TOP - 32 : LIC_BOTTOM) - 230 }, cut: 60, line: 14,
+  });
+
   const blanks = {
     'event-badge': {
       w: 1200, h: 1600,
@@ -344,8 +356,120 @@
         }
       },
     },
+
+    // Horizontal license card (CR80 proportions): issuer band on top, photo
+    // (+ barcode under it) on the left, the holder's fields on the right over
+    // a grid of license tiles — one per license (js/licenses.js), solid when
+    // granted (S.doc.licenses), outlined and faded when not.
+    license: {
+      w: 1600, h: 1010,
+      outline: LIC_OUTLINE,
+      // a getter: the window grows when the barcode is off
+      get portrait() { return licPortrait(SINFORGE.state.style); },
+      get photo() { return SINFORGE.frameWindow(this.portrait); },
+      texts: [
+        { id: 'authority', label: 'f_authority', max: 32 },
+        { id: 'licenseNo', label: 'f_licno', max: 16, gen: 'serial' },
+        { id: 'name1', label: 'f_given', max: 24 },
+        { id: 'name2', label: 'f_surname', max: 18 },
+        { id: 'dob', label: 'f_dob', max: 10, gen: 'dob', date: true },
+        { id: 'expires', label: 'f_expires', max: 10, gen: 'expiry', date: true },
+      ],
+      names: { first: 'name1', last: 'name2' },
+      // the left panel adds a toggle per license (S.doc.licenses)
+      licenses: true,
+      decor: ['stripes', 'slashes', 'barcode', 'edge'],
+
+      draw(ctx, k, { gfx, st, doc }) {
+        const ink = st.ink;
+        const X = 620, R = 1450; // the right column's edges
+
+        // outer edge line + inner contour
+        if (st.edge) {
+          gfx.poly(ctx, LIC_OUTLINE);
+          ctx.strokeStyle = ink; ctx.lineWidth = 10; ctx.lineJoin = 'miter';
+          ctx.stroke();
+        }
+        gfx.poly(ctx, gfx.inset(LIC_OUTLINE, 22));
+        ctx.strokeStyle = ink; ctx.lineWidth = 5; ctx.lineJoin = 'miter';
+        ctx.stroke();
+
+        // issuer band (as on the citizen ID), 28 clear of the contour's raised
+        // right-hand part
+        gfx.poly(ctx, [[180, 130], [R, 130], [R, 160], [R - 30, 190], [150, 190], [150, 160]]);
+        ctx.fillStyle = ink;
+        ctx.fill();
+        const ISS = 42;
+        const issBase = 160 + gfx.ascent(ctx, 'H', 700, ISS) / 2;
+        const issW = gfx.text(ctx, doc.authority, 180, issBase, { size: ISS, maxW: 1000, color: st.card, spacing: 0.04 });
+        if (st.slashes) {
+          ctx.fillStyle = st.card;
+          let x = 180 + issW + 30;
+          for (let i = 0; i < 3 && x < 1310; i++, x += 26) gfx.slant(ctx, x, 144, 176, 13, 16);
+          if (x < 1340) gfx.slant(ctx, x + 6, 144, 176, 1380 - x - 6, 16);
+        }
+
+        // hazard stripes between the photo column and the fields
+        if (st.stripes) gfx.stripes(ctx, 564, 592, 230, LIC_BOTTOM, ink, false);
+
+        // photo, clipped to its window, then the portrait frame
+        gfx.portrait(ctx, this.photo, k, st);
+
+        // barcode under the photo, encoding the license number (a 2D code
+        // centred in the slot)
+        if (st.barcode) {
+          const h = LIC_BOTTOM - LIC_CODE_TOP;
+          const box = SINFORGE.codeSquare(st)
+            ? { x: 150 + (394 - h) / 2, y: LIC_CODE_TOP, w: h, h }
+            : { x: 150, y: LIC_CODE_TOP, w: 394, h };
+          gfx.code(ctx, k, box, doc.licenseNo, st);
+        }
+
+        // license grid: two rows of square tiles across the right column, the
+        // bottom row level with the photo column's bottom
+        const keys = SINFORGE.licenseOrder, COLS = Math.ceil(keys.length / 2), GAP = 14;
+        const tw = (R - X - GAP * (COLS - 1)) / COLS;
+        const gridTop = LIC_BOTTOM - 2 * tw - GAP;
+        const granted = Array.isArray(doc.licenses) ? doc.licenses : [];
+        keys.forEach((key, i) => {
+          const box = { x: X + (i % COLS) * (tw + GAP), y: gridTop + Math.floor(i / COLS) * (tw + GAP), w: tw, h: tw };
+          gfx.license(ctx, k, box, key, granted.includes(key), st);
+        });
+
+        // the grid's heading: a caption and a rule running on to the right edge,
+        // with the granted count in the accent colour at its end
+        const CAP = 22, CAP_GAP = 12, BIG = 72, VAL = 50;
+        const capA = gfx.ascent(ctx, 'H', 400, CAP);
+        const headBase = gridTop - 20;
+        const headW = gfx.text(ctx, 'LICENSES', X, headBase, { size: CAP, color: ink, weight: 400, spacing: 0.14 });
+        const count = `${granted.filter((g) => keys.includes(g)).length}/${keys.length}`;
+        ctx.font = `700 ${CAP}px ${SINFORGE.const.FONT}`;
+        const countW = ctx.measureText(count).width;
+        gfx.text(ctx, count, R - countW, headBase, { size: CAP, color: st.accent });
+        ctx.fillStyle = ink;
+        ctx.fillRect(X + headW + 18, headBase - capA / 2 - 2, R - countW - 18 - (X + headW + 18), 4);
+
+        // the holder's fields, laid out from the caption's cap top (as on the
+        // citizen ID), the leftover height shared out as the gap between rows
+        const rowH = (size) => capA + CAP_GAP + gfx.ascent(ctx, 'H', 700, size);
+        const GAP_Y = (headBase - capA - 230 - rowH(BIG) - 2 * rowH(VAL)) / 3;
+        const field = (cap, val, x, top, maxW, size, isDate) => {
+          size = size || VAL;
+          const valBase = top + rowH(size);
+          gfx.text(ctx, cap, x, top + capA, { size: CAP, maxW, color: ink, weight: 400, spacing: 0.14 });
+          (isDate ? gfx.date : gfx.text)(ctx, val, x, valBase, { size, maxW, color: ink }, st);
+          return valBase + GAP_Y;
+        };
+        let y = 230; // level with the photo window's top
+        y = field('SURNAME', doc.name2, X, y, R - X, BIG);
+        field('DATE OF BIRTH', doc.dob, 1130, y, R - 1130, VAL, true);
+        y = field('GIVEN NAMES', doc.name1, X, y, 480);
+        field('EXPIRES', doc.expires, 1130, y, R - 1130, VAL, true);
+        field('LICENSE NO.', doc.licenseNo, X, y, 480);
+      },
+    },
   };
 
   SINFORGE.blanks = blanks;
-  SINFORGE.blankOrder = ['event-badge', 'citizen-id'];
+  SINFORGE.blankOrder = ['event-badge', 'citizen-id', 'license'];
 })(window.SINFORGE);

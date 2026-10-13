@@ -42,6 +42,11 @@ SINFORGE.newDoc = () => ({
   expires: '2084-12-31',
   district: 'NORTH HARBOR // BLOCK 12',
   status: 'CLASS C // CITIZEN',
+  // license card
+  authority: 'LICENSE BUREAU // SECTOR 7',
+  licenseNo: 'LIC-7731-0304',
+  licenses: ['firearms', 'driver', 'medic', 'detective'], // granted keys (js/licenses.js)
+  licCaps: {},     // custom captions by license key (a tile's own text replaces its built-in one)
 });
 
 // Default look: colours, decorations, photo + card effects.
@@ -114,4 +119,5 @@ SINFORGE.state = {
   photo: null,                    // source canvas of the photo (user upload in IndexedDB, else the doggo)
   photoIsUser: false,             // true when the photo came from the user
   wmImage: null,                  // source canvas of the watermark image (IndexedDB 'watermark')
+  licIcons: {},                   // custom license icons by key: one-colour masks (IndexedDB 'lic:<key>')
 };

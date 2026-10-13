@@ -14,14 +14,29 @@ client-side; your images are never uploaded.
 
 - **Blanks** — pick a pre-defined document from the icon bar above the canvas, each icon showing its
   shape (silhouette + photo window); everything else is filled in on top
-  of it. **EVENT BADGE** (1200×1600 vertical con badge) and **CITIZEN ID**
+  of it. **EVENT BADGE** (1200×1600 vertical con badge), **CITIZEN ID**
   (1600×1010 horizontal ID card, CR80 proportions: issuer band, photo, labelled
   data fields, contact chip, a DNA strip seeded by the holder's fields —
   click it to switch between a double helix and the plain A/C/G/T letters —
-  machine-readable zone built from the fields).
+  machine-readable zone built from the fields) and **LICENSE CARD** (1600×1010:
+  authority band, photo with a barcode under it, the holder's fields and a grid
+  of 12 license tiles, each marked by an icon: firearms, blades, explosives,
+  driver, pilot, medical, detective, security, bounty hunter, decker, magic,
+  cyberware. Granted licenses print as solid tiles, the rest outlined and
+  faded; toggle them in the left panel or click a tile on the card. Any
+  license can be made your own: hover its icon in the left panel (or its tile
+  on the card) and click the pencil to give it a custom caption and upload a custom icon (printed in one
+  colour — a transparent PNG or a dark icon on a light background works best;
+  kept in your browser). The upload opens a crop window: a square frame
+  (drag it, resize from the corner or with the wheel) with guides showing the
+  standard icon size — a dashed safe square, centre lines and a ghost of the
+  built-in icon. FIT sizes the frame so the icon fills the safe square (it
+  opens that way), MAX takes the whole image; the frame may run past the
+  image to give a tight picture room. RESET brings back the built-in one).
 - **Text** — event badge: badge number, vertical role tag, title, two-line
   name, footer line. Citizen ID: issuer, SIN number, given names, surname, sex,
   metatype (HUMAN, ELF, ORK…, with a random-metatype die), date of birth, expiry (both with a random-date die), district, status.
+  License card: authority, license number, given names, surname, date of birth, expiry.
   Long text shrinks to fit its slot. The die button next to the badge number
   generates a random serial in one of 5 formats (`#92-0329`, `SIN-2950-0982`,
   `NZ-4085-Z`, `C4:16:F4:79`, `NMS/22137`).

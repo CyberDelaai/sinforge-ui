@@ -59,6 +59,12 @@
     merge(S.names, load('sinforge:names'));
     if (S.out.scale !== 1 && S.out.scale !== 2) S.out.scale = 1;
     if (!SINFORGE.frames[S.style.frame]) S.style.frame = 'notch';
+    if (!Array.isArray(S.doc.licenses)) S.doc.licenses = SINFORGE.newDoc().licenses;
+    S.doc.licenses = S.doc.licenses.filter((key) => SINFORGE.licenses[key]);
+    if (!S.doc.licCaps || Array.isArray(S.doc.licCaps)) S.doc.licCaps = {};
+    Object.keys(S.doc.licCaps).forEach((key) => {
+      if (!SINFORGE.licenses[key] || typeof S.doc.licCaps[key] !== 'string') delete S.doc.licCaps[key];
+    });
   }
 
   // ---- render scheduling: at most one preview render per frame ----
@@ -397,6 +403,231 @@
       box.appendChild(f);
       if (blank().names && slot.id === blank().names.last) box.appendChild(buildNameGen());
     });
+    if (blank().licenses) box.appendChild(buildLicensePick());
+  }
+
+  // ---- license toggles (a blank with `licenses: true`): one icon per license,
+  // drawn from its own geometry (or the custom icon); pressed = granted
+  // (S.doc.licenses). Hovering one shows its edit button, which opens the
+  // editor under the grid: a custom caption (S.doc.licCaps) and icon ----
+  const PEN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M13.5 6.5l4 4"/></svg>';
+  function licenseIcon(key) {
+    const mask = S.licIcons[key];
+    if (mask) {
+      const url = mask.__url || (mask.__url = mask.toDataURL());
+      return `<span class="li-img" aria-hidden="true" style="-webkit-mask-image:url(${url});mask-image:url(${url})"></span>`;
+    }
+    return '<svg viewBox="-4 -4 108 108" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
+      + licenseShapes(key) + '</svg>';
+  }
+  // a license's built-in geometry as SVG markup in its 0..100 square
+  function licenseShapes(key) {
+    const f = (v) => +v.toFixed(2);
+    return SINFORGE.licenses[key].shapes().map((sh) => {
+        const cls = sh.cut ? 'li-cut' : 'li-ink';
+        if (sh.c) return `<circle class="${cls}" cx="${f(sh.c[0])}" cy="${f(sh.c[1])}" r="${f(sh.c[2])}"/>`;
+        if (sh.ring) return `<circle class="${cls} li-stroke" style="stroke-width:${sh.w || 6}" cx="${f(sh.ring[0])}" cy="${f(sh.ring[1])}" r="${f(sh.ring[2])}"/>`;
+        const pts = (sh.p || sh.l).map((p) => p.map(f).join(',')).join(' ');
+        if (sh.p) return `<polygon class="${cls}" points="${pts}"/>`;
+        return `<polyline class="${cls} li-stroke" style="stroke-width:${sh.w || 6}" points="${pts}"/>`;
+      }).join('');
+  }
+  function toggleLicense(key) {
+    const L = S.doc.licenses, i = L.indexOf(key);
+    if (i < 0) L.push(key); else L.splice(i, 1);
+    persist.doc();
+    syncLicensePick();
+    requestRender();
+  }
+
+  // A custom icon as a one-colour alpha mask (longest edge `max`): images with
+  // real transparency keep their alpha; opaque ones are read by brightness,
+  // the glyph being whichever side differs from the border (dark on light or
+  // light on dark).
+  function iconMask(src, max) {
+    const f = Math.min(1, max / Math.max(src.width, src.height));
+    const w = Math.max(1, Math.round(src.width * f)), h = Math.max(1, Math.round(src.height * f));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.drawImage(src, 0, 0, w, h);
+    const im = x.getImageData(0, 0, w, h), d = im.data;
+    const luma = (i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    let clear = 0, edge = 0, edgeN = 0;
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      if (d[i + 3] < 250) clear++;
+      const px = p % w, py = (p - px) / w;
+      if (px === 0 || py === 0 || px === w - 1 || py === h - 1) { edge += luma(i); edgeN++; }
+    }
+    const byAlpha = clear > w * h * 0.05, darkGlyph = edge / edgeN >= 128;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = luma(i);
+      d[i + 3] = byAlpha ? d[i + 3] : clamp(((darkGlyph ? 255 - l : l) - 40) * 1.4, 0, 255);
+      d[i] = d[i + 1] = d[i + 2] = 0;
+    }
+    x.putImageData(im, 0, 0);
+    c.__id = ++photoSeq; // icon cache key in render.js
+    return c;
+  }
+  function setLicenseIcon(key, file) {
+    if (!file || !/^image\//.test(file.type)) { setStatus(t('st_badimg'), 'warn'); return; }
+    // masked first (so a frame running past the picture adds transparent room,
+    // never background), then cropped to a square in the crop window; the
+    // cropped mask is what's kept
+    blobToCanvas(file).then((c) => SINFORGE.crop.open(iconMask(c, 1024), { guide: licenseShapes(key), fit: 0.88, out: 256 }))
+      .then((m) => {
+        if (!m) return;
+        m.__id = ++photoSeq; // icon cache key in render.js
+        S.licIcons[key] = m;
+        refreshLicense(key);
+        setStatus(t('st_licicon'), 'ok');
+        m.toBlob((blob) => { if (blob) SINFORGE.idb.put('assets', 'lic:' + key, blob).catch(() => {}); }, 'image/png');
+      }, () => setStatus(t('st_badimg'), 'warn'));
+  }
+  function resetLicense(key) {
+    delete S.licIcons[key];
+    delete S.doc.licCaps[key];
+    persist.doc();
+    SINFORGE.idb.del('assets', 'lic:' + key).catch(() => {});
+    const cap = $('licCap');
+    if (cap) cap.value = '';
+    refreshLicense(key);
+  }
+  function restoreLicenseIcons() {
+    SINFORGE.licenseOrder.forEach((key) => {
+      SINFORGE.idb.get('assets', 'lic:' + key)
+        // stored already masked + cropped: used as it is
+        .then((blob) => blob && blobToCanvas(blob).then((c) => { S.licIcons[key] = c; refreshLicense(key); }))
+        .catch(() => {});
+    });
+  }
+  // redraw one toggle's icon (+ tooltip) and the card after an edit
+  function refreshLicense(key) {
+    const btn = document.querySelector(`.lic-opt[data-license="${key}"]`);
+    if (btn) btn.innerHTML = licenseIcon(key);
+    syncLicensePick();
+    requestRender();
+  }
+
+  let licEdit = null; // the license key the editor is open on
+  let licOpenEdit = null; // opens the editor on a key (set by buildLicensePick; the stage's pencil uses it)
+  function buildLicensePick() {
+    const wrap = document.createElement('div');
+    wrap.className = 'field';
+    const lab = i18nEl('label', 'l_licenses');
+    lab.id = 'licLbl';
+    const grid = document.createElement('div');
+    grid.className = 'blank-pick lic-pick';
+    grid.id = 'licPick';
+    grid.setAttribute('role', 'group');
+    grid.setAttribute('aria-labelledby', 'licLbl');
+
+    // the editor, shown under the grid for one license at a time
+    const ed = document.createElement('div');
+    ed.className = 'gen-config lic-editor';
+    ed.id = 'licEditor';
+    const capLab = i18nEl('label', 'l_liccap');
+    capLab.htmlFor = 'licCap';
+    const cap = document.createElement('input');
+    cap.type = 'text';
+    cap.id = 'licCap';
+    cap.maxLength = 16;
+    cap.spellcheck = false;
+    cap.addEventListener('input', () => {
+      if (!licEdit) return;
+      if (cap.value.trim()) S.doc.licCaps[licEdit] = cap.value;
+      else delete S.doc.licCaps[licEdit];
+      persist.doc();
+      syncLicensePick();
+      requestRender();
+    });
+    const file = document.createElement('input');
+    file.type = 'file';
+    file.accept = 'image/*';
+    file.hidden = true;
+    file.addEventListener('change', (e) => { if (licEdit) setLicenseIcon(licEdit, e.target.files[0]); e.target.value = ''; });
+    const mkBtn = (key, fn) => {
+      const b = i18nEl('button', key, 'btn btn-sm');
+      b.type = 'button';
+      b.setAttribute('data-augmented-ui', 'tl-clip br-clip border');
+      b.addEventListener('click', fn);
+      return b;
+    };
+    const btnRow = document.createElement('div');
+    btnRow.className = 'btn-row mt';
+    btnRow.append(
+      mkBtn('b_licicon', () => file.click()),
+      mkBtn('b_reset', () => { if (licEdit) resetLicense(licEdit); }),
+    );
+    const capField = document.createElement('div');
+    capField.className = 'field';
+    capField.append(capLab, cap);
+    ed.append(capField, btnRow, file, i18nEl('p', 'hint_licicon', 'hint mt'));
+
+    const setEdit = (key) => {
+      licEdit = key;
+      ed.hidden = !key;
+      grid.querySelectorAll('.lic-pen').forEach((p) => {
+        const on = p.dataset.license === key;
+        p.classList.toggle('active', on);
+        p.setAttribute('aria-expanded', String(on));
+      });
+      if (key) {
+        cap.value = S.doc.licCaps[key] || '';
+        cap.placeholder = SINFORGE.licenses[key].cap;
+      }
+    };
+
+    SINFORGE.licenseOrder.forEach((key) => {
+      const cell = document.createElement('div');
+      cell.className = 'lic-cell';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt lic-opt';
+      btn.dataset.license = key;
+      btn.setAttribute('role', 'checkbox');
+      btn.innerHTML = licenseIcon(key);
+      btn.onclick = () => toggleLicense(key);
+      const pen = document.createElement('button');
+      pen.type = 'button';
+      pen.className = 'lic-pen';
+      pen.dataset.license = key;
+      pen.setAttribute('data-i18n-title', 'b_licedit');
+      pen.title = t('b_licedit');
+      pen.setAttribute('aria-label', t('b_licedit'));
+      pen.setAttribute('aria-controls', 'licEditor');
+      pen.innerHTML = PEN_SVG;
+      pen.onclick = () => {
+        setEdit(licEdit === key ? null : key);
+        if (licEdit) cap.focus();
+      };
+      cell.append(btn, pen);
+      grid.appendChild(cell);
+    });
+    wrap.append(lab, grid, ed);
+    setEdit(null);
+    licOpenEdit = setEdit;
+    syncLicensePick(grid);
+    return wrap;
+  }
+  // pressed state + tooltip: a custom caption names its toggle (and is never
+  // re-translated); otherwise the license's own translated name
+  function syncLicensePick(grid) {
+    grid = grid || $('licPick');
+    if (!grid) return;
+    grid.querySelectorAll('.lic-opt').forEach((btn) => {
+      const key = btn.dataset.license, custom = S.doc.licCaps[key];
+      btn.setAttribute('aria-checked', String(S.doc.licenses.includes(key)));
+      btn.classList.toggle('custom', !!(custom || S.licIcons[key]));
+      if (custom) {
+        btn.removeAttribute('data-i18n-title');
+        btn.title = custom;
+      } else {
+        btn.setAttribute('data-i18n-title', 'li_' + key);
+        btn.title = t('li_' + key);
+      }
+    });
   }
 
   // ---- name generator: GENERATE NAME + a settings toggle (js/names.js) ----
@@ -696,35 +927,49 @@
   const dateAt = (p) => SINFORGE.gfx.dateBoxes.find((b) => inBox(p, {
     x: b.x - DATE_PAD, y: b.y - DATE_PAD, w: b.w + 2 * DATE_PAD, h: b.h + 2 * DATE_PAD,
   }));
+  // the license tile under a point (as last rendered — gfx.licenseBoxes), or undefined
+  const licenseAt = (p) => SINFORGE.gfx.licenseBoxes.find((b) => inBox(p, b));
   // what a point on the canvas hits: 'photo', 'code' (the barcode as last
-  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'date' or null
+  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'date',
+  // 'license' or null
   function hitAt(p) {
     if (inPhoto(p)) return 'photo';
     if (inBox(p, SINFORGE.gfx.codeBox)) return 'code';
     if (inBox(p, SINFORGE.gfx.chipBox)) return 'chip';
     if (inBox(p, SINFORGE.gfx.dnaBox)) return 'dna';
+    if (licenseAt(p)) return 'license';
     return dateAt(p) ? 'date' : null;
   }
   // each click target's picker (the DNA strip has none: a click flips it
-  // between the helix and the letters)
+  // between the helix and the letters; nor a license tile: a click grants /
+  // revokes it)
   const STAGE_POPS = { photo: 'framePop', code: 'codePop', chip: 'chipPop', date: 'datePop' };
-  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna', license: 'hint_lic' };
   const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox' };
   // hover marker: the photo window's outline (or the barcode's / chip's /
-  // the hovered date's box) laid over the canvas
+  // the hovered date's / license tile's box) laid over the canvas; a license
+  // tile also gets the edit pencil on its top-right corner
   function showHover(hit, p) {
-    const svg = $('photoHover');
+    const svg = $('photoHover'), pen = $('licPenStage');
     $('docCanvas').classList.toggle('over-photo', !!hit);
     $('docCanvas').title = hit ? t(HINTS[hit]) : '';
     svg.classList.toggle('show', !!hit);
+    pen.hidden = hit !== 'license';
     if (!hit) return;
     const B = blank(), d = drawnRect(), s = $('stage').getBoundingClientRect();
+    if (hit === 'license') {
+      const tile = licenseAt(p);
+      pen.dataset.license = tile.key;
+      pen.style.left = d.left - s.left + (tile.x + tile.w) * d.f - pen.offsetWidth * 0.6 + 'px';
+      pen.style.top = d.top - s.top + tile.y * d.f - pen.offsetHeight * 0.4 + 'px';
+    }
     svg.setAttribute('viewBox', `0 0 ${B.w} ${B.h}`);
     Object.assign(svg.style, {
       left: d.left - s.left + 'px', top: d.top - s.top + 'px',
       width: B.w * d.f + 'px', height: B.h * d.f + 'px',
     });
-    const c = hit === 'date' ? dateAt(p) : SINFORGE.gfx[BOXES[hit]], pad = hit === 'date' ? DATE_PAD : 8;
+    const c = hit === 'date' ? dateAt(p) : hit === 'license' ? licenseAt(p) : SINFORGE.gfx[BOXES[hit]];
+    const pad = hit === 'date' ? DATE_PAD : hit === 'license' ? 4 : 8;
     const poly = hit === 'photo' ? B.photo.poly
       : [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
     svg.firstElementChild.setAttribute('points', poly.map((p) => p.join(',')).join(' '));
@@ -749,12 +994,20 @@
       const p = docPoint(e), hit = hitAt(p);
       if (!hit) return;
       // a press that barely moves is a click (its picker); more drags the photo
-      drag = { hit, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, tx: S.tf.x, ty: S.tf.y, moved: false };
+      drag = { hit, lic: hit === 'license' && licenseAt(p).key, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, tx: S.tf.x, ty: S.tf.y, moved: false };
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener('pointermove', (e) => {
       const p = docPoint(e);
-      if (!drag) { showHover(hitAt(p), p); return; }
+      if (!drag) {
+        // heading for the license pencil (it overhangs its tile): keep it up
+        // while the pointer is within a few px of it
+        const hit = hitAt(p), pr = $('licPenStage').getBoundingClientRect();
+        if (!hit && !$('licPenStage').hidden && e.clientX > pr.left - 10 && e.clientX < pr.right + 10
+          && e.clientY > pr.top - 10 && e.clientY < pr.bottom + 10) return;
+        showHover(hit, p);
+        return;
+      }
       if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 5) return;
       if (drag.hit !== 'photo' || !S.photo) return;
       if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(null); }
@@ -765,7 +1018,7 @@
     });
     cv.addEventListener('pointerup', (e) => {
       if (!drag) return;
-      const { hit, moved } = drag;
+      const { hit, moved, lic } = drag;
       drag = null;
       cv.classList.remove('dragging');
       if (moved) persist.tf();
@@ -773,10 +1026,29 @@
         closeStagePops();
         S.style.dnaText = !S.style.dnaText;
         persist.style(); requestRender();
+      } else if (hit === 'license') {
+        closeStagePops();
+        toggleLicense(lic);
       } else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
-    cv.addEventListener('pointerleave', () => { if (!drag) showHover(null); });
+    // the pencil sits over the canvas: moving onto it keeps the hover, leaving
+    // it for anywhere but the canvas ends it
+    const pen = $('licPenStage');
+    cv.addEventListener('pointerleave', (e) => { if (!drag && !pen.contains(e.relatedTarget)) showHover(null); });
+    pen.addEventListener('pointerleave', (e) => { if (e.relatedTarget !== cv) showHover(null); });
+    pen.innerHTML = PEN_SVG;
+    pen.title = t('b_licedit');
+    pen.setAttribute('aria-label', t('b_licedit'));
+    // open the left panel's editor on this license, scrolled into view
+    pen.addEventListener('click', () => {
+      if (!licOpenEdit) return;
+      closeStagePops();
+      licOpenEdit(pen.dataset.license);
+      const ed = $('licEditor');
+      ed.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      $('licCap').focus({ preventScroll: true });
+    });
     Object.values(STAGE_POPS).forEach((id) => $(id).querySelector('.adj-close').addEventListener('click', closeStagePops));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeStagePops(); });
     // a press anywhere but a picker or a click target closes them (a click on
@@ -896,6 +1168,7 @@
       .catch(() => {}).then(requestRender);
     restorePhoto();
     restoreWatermark();
+    restoreLicenseIcons();
   }
 
   document.addEventListener('DOMContentLoaded', init);

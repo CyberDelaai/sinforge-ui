@@ -303,6 +303,70 @@
   .blank-opt .bi-chip { fill: color-mix(in srgb, currentColor 30%, transparent); }
   .blank-opt .bi-none { fill: none; }
   .blank-opt .bi-line { stroke: currentColor; stroke-width: 1.5px; stroke-linejoin: miter; }
+  /* license toggles: a grid of icons, the cut shapes in the button's own background */
+  .lic-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .lic-pick .blank-opt { width: 100%; height: auto; aspect-ratio: 1; padding: 5px; }
+  .lic-cell { position: relative; }
+  .blank-opt .li-img {
+    display: block; width: 100%; height: 100%; background: currentColor;
+    -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat;
+  }
+  /* edit button: a small pencil tab on the toggle's top-right corner, shown on
+     hover / focus (always on touch screens) and while its editor is open */
+  .lic-pen {
+    position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; padding: 2px;
+    display: grid; place-items: center; cursor: pointer; line-height: 0;
+    background: var(--panel); color: var(--main); border: 1px solid rgba(var(--main-rgb),0.8);
+    opacity: 0; transition: opacity .12s;
+  }
+  .lic-pen svg { width: 100%; height: 100%; }
+  .lic-cell:hover .lic-pen, .lic-cell:focus-within .lic-pen, .lic-pen.active { opacity: 1; }
+  .lic-pen.active, .lic-pen:hover { color: var(--accent); border-color: var(--accent); }
+  .lic-pen:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  @media (hover: none) { .lic-pen { opacity: 1; } }
+  .lic-editor { margin-top: 10px; }
+
+  /* crop window (ported from commlink-ui's crop modal) */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(2px);
+  }
+  .modal-overlay[hidden] { display: none; }
+  .config.crop-box { width: min(540px, calc(100vw - 32px)); padding: 20px; --aug-border-bg: rgba(var(--accent-rgb),0.45); }
+  .crop-box h2 { color: var(--accent); letter-spacing: 3px; }
+  .crop-stage {
+    position: relative; width: 100%; height: min(360px, 55vh); overflow: hidden; user-select: none;
+    background: #000; border: 1px solid rgba(var(--main-rgb),0.25); touch-action: none;
+  }
+  .crop-stage canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .crop-frame {
+    position: absolute; cursor: move; touch-action: none;
+    outline: 2px solid var(--main);
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.55), 0 0 12px rgba(var(--main-rgb),0.5);
+  }
+  .crop-guide { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .crop-guide .crop-safe {
+    fill: none; stroke: var(--accent); stroke-width: 1.5px; vector-effect: non-scaling-stroke; stroke-dasharray: 6 4;
+  }
+  .crop-guide .crop-mid { stroke: rgba(var(--main-rgb),0.35); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+  /* ghost of the built-in icon: the size a custom one should match */
+  .crop-guide .crop-ghost { color: var(--accent); opacity: .22; }
+  .crop-guide .li-ink { fill: currentColor; }
+  .crop-guide .li-cut { fill: none; stroke: none; }
+  .crop-guide .li-stroke { fill: none; stroke: currentColor; }
+  .crop-handle {
+    position: absolute; right: -8px; bottom: -8px; width: 14px; height: 14px;
+    background: var(--main); cursor: nwse-resize;
+  }
+  .crop-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .crop-gap { flex: 1; }
+  /* the same pencil on the stage, over the hovered license tile's corner */
+  .lic-pen.stage-pen { width: 24px; height: 24px; padding: 3px; z-index: 5; opacity: 1; color: var(--accent); border-color: var(--accent); }
+  .lic-pen.stage-pen[hidden] { display: none; }
+  .blank-opt .li-ink { fill: currentColor; }
+  .blank-opt .li-cut { fill: var(--panel); }
+  .blank-opt .li-stroke { fill: none; stroke: currentColor; stroke-linejoin: miter; }
+  .blank-opt .li-cut.li-stroke { stroke: var(--panel); }
   .blank-opt:hover { color: var(--main); border-color: rgba(var(--main-rgb),0.8); }
   .blank-opt:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
   .blank-opt[aria-checked="true"] {
