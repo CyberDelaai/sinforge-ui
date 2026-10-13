@@ -70,6 +70,13 @@ client-side; your images are never uploaded.
   multiply on light cards, screen (lighten) on dark ones.
   It marks the card background only: every element sits on top of it and the
   photo window stays clean.
+- **DIGITAL mode** — the icon at the stage's top-right corner shows the card
+  as a digital document shared from a device over the air: a matrix grid
+  behind it (glyph columns, a grid, a perspective floor, motes), a glow and holo brackets around
+  the card and a wireless HUD: the emitter's readout and the log of a finished
+  transfer. What the stage shows is what you export: while it's on, the PNG is
+  the whole scene (an opaque image, larger than the card — OUTPUT shows its
+  size).
 - **Colours** — card / ink / accent, with one-click schemes (paper, night,
   toxic, blood, chrome, sunset). On dark schemes the photo tones flip so the
   picture never prints as a negative.

@@ -77,6 +77,7 @@
       const cv = $('docCanvas'), B = blank();
       if (cv.width !== B.w || cv.height !== B.h) { cv.width = B.w; cv.height = B.h; }
       SINFORGE.render(cv.getContext('2d'), 1);
+      SINFORGE.digital.sync();
     });
   }
 
@@ -830,7 +831,10 @@
     $('zoomRange').value = Math.round(S.tf.zoom * 100);
     $('zoomVal').textContent = Math.round(S.tf.zoom * 100) + '%';
     $('scaleSwitch').dataset.pos = S.out.scale === 2 ? 'right' : 'left';
-    $('sizeVal').textContent = `${blank().w * S.out.scale}×${blank().h * S.out.scale}`;
+    // DIGITAL mode exports the card inside its scene (js/digital.js)
+    const sz = S.out.digital ? SINFORGE.digital.exportSize(blank().w * S.out.scale, blank().h * S.out.scale)
+      : { w: blank().w * S.out.scale, h: blank().h * S.out.scale };
+    $('sizeVal').textContent = `${sz.w}×${sz.h}`;
   }
   // Rotation wheel: drag around it to aim the needle (Shift snaps to 15°),
   // arrow keys nudge by 1° (Shift: 15°), double-click resets to data-default.
@@ -1140,13 +1144,15 @@
   function fileName() {
     const slug = [S.doc.name1, S.doc.name2].join('-').toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    return `sinforge-${slug || 'document'}-${S.out.scale}x.png`;
+    return `sinforge-${slug || 'document'}${S.out.digital ? '-digital' : ''}-${S.out.scale}x.png`;
   }
-  // The document as a PNG Blob at the chosen scale. Rejects on a tainted canvas
-  // (opened via file://) or a failed encode.
+  // The document as a PNG Blob at the chosen scale — in DIGITAL mode the
+  // rendered card composed into its scene (js/digital.js). Rejects on a tainted
+  // canvas (opened via file://) or a failed encode.
   function pngBlob() {
     return new Promise((res, rej) => {
-      const c = SINFORGE.renderCanvas(S.out.scale);
+      const card = SINFORGE.renderCanvas(S.out.scale);
+      const c = S.out.digital ? SINFORGE.digital.compose(card) : card;
       c.toBlob((blob) => (blob ? res(blob) : rej(new Error('encode'))), 'image/png');
     });
   }
@@ -1187,6 +1193,8 @@
     bindPops();
     bindLicEditor();
     bindDropPaste();
+    SINFORGE.digital.init();
+    document.addEventListener('sinforge:digital', syncControls);
     syncControls();
     requestRender();
     // canvas text needs the webfont actually loaded: re-render once it is

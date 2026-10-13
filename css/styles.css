@@ -512,6 +512,25 @@
   .stage-tool[aria-expanded="true"] {
     color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.45);
   }
+  /* DIGITAL mode toggle: the stage's top-right icon (an on/off, not a window) */
+  .stage-tool-r { left: auto; right: 8px; }
+  .stage-tool[aria-pressed="true"] {
+    color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.45);
+  }
+
+  /* DIGITAL mode (js/digital.js): the scene canvas behind the card (grid,
+     brackets, HUD — the same paint as the PNG) and the card's glow. --digi-rgb
+     follows the card's accent (set by the script). The stage isolates so the
+     backdrop's z-index -1 stays above the stage's own background. */
+  .stage { isolation: isolate; --digi-rgb: var(--main-rgb); }
+  .digi-bg { display: none; }
+  .stage.digital {
+    padding: 34px 24px 58px; border-style: solid; border-color: rgba(var(--digi-rgb),0.35);
+    background: radial-gradient(ellipse at 50% 45%, #0a0d16 0%, #030307 70%);
+  }
+  .stage.digital .digi-bg { display: block; position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none; }
+  .stage.digital .doc-canvas { filter: drop-shadow(0 0 10px rgba(var(--digi-rgb),0.45)) drop-shadow(0 0 28px rgba(var(--digi-rgb),0.18)); }
+
   .adj-pop {
     position: absolute; top: 0; right: calc(100% + 22px); z-index: 40;
     --aug-border-bg: rgba(var(--accent-rgb),0.45);

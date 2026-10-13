@@ -114,7 +114,7 @@ SINFORGE.state = {
   doc: SINFORGE.newDoc(),         // text slots (sinforge:doc)
   style: SINFORGE.newStyle(),     // look (sinforge:style)
   tf: SINFORGE.newTransform(),    // photo framing (sinforge:tf)
-  out: { scale: 1 },              // export scale: 1 | 2 (sinforge:out)
+  out: { scale: 1, digital: false }, // export scale: 1 | 2; DIGITAL stage mode on/off (sinforge:out)
   names: SINFORGE.newNames(),     // name-generator settings (sinforge:names)
   photo: null,                    // source canvas of the photo (user upload in IndexedDB, else the doggo)
   photoIsUser: false,             // true when the photo came from the user
