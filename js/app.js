@@ -149,14 +149,18 @@
   }
 
   // ---- left panel: blank picker + text slots built from the blank ----
-  // each blank is an icon of its own silhouette (outline + photo window),
-  // drawn from its polygons in native pixel space; the name is the tooltip
+  // each blank is an icon of its own silhouette (outline + solid photo window
+  // + its `mark` letter on the body), drawn from its polygons in native pixel
+  // space; the name is the tooltip
   function blankIcon(B) {
-    const pts = (poly) => poly.map((p) => p.join(',')).join(' ');
+    const pts = (poly) => poly.map((p) => p.map((v) => +v.toFixed(1)).join(',')).join(' ');
     const pad = Math.max(B.w, B.h) * 0.02;
+    const m = B.mark;
     return `<svg viewBox="${-pad} ${-pad} ${B.w + 2 * pad} ${B.h + 2 * pad}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`
       + `<polygon class="bi-card" points="${pts(B.outline)}"/>`
-      + `<polygon class="bi-photo" points="${pts(B.photo.poly)}"/></svg>`;
+      + `<polygon class="bi-photo" points="${pts(B.photo.poly)}"/>`
+      + (m ? `<text class="bi-letter" x="${m.x}" y="${m.y}" font-size="${m.size}" text-anchor="middle" dominant-baseline="central">${m.ch}</text>` : '')
+      + '</svg>';
   }
   function buildBlankSelect() {
     const box = $('blankPick');

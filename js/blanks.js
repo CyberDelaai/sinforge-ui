@@ -15,6 +15,8 @@
   //   names     optional { first, last, title? }: slot ids the name generator
   //             fills — adds a GENERATE NAME row (+ its settings) after `last`
   //   decor     which decoration toggles apply (keys in S.style)
+  //   mark      { ch, x, y, size }: the letter on the blank picker's icon, centred
+  //             at (x, y) on the card body, clear of the photo
   //   draw(ctx, k, env)  paints the blank inside the clipped card body using
   //             env.gfx primitives; env.st is the style, env.doc the text.
   // Add a blank by adding an entry + its key to SINFORGE.blankOrder (and a
@@ -98,6 +100,7 @@
       ],
       names: { first: 'name1', last: 'name2', title: 'title' },
       decor: ['stripes', 'slashes', 'barcode', 'edge'],
+      mark: { ch: 'E', x: 600, y: 1310, size: 480 },
 
       draw(ctx, k, { gfx, st, doc }) {
         const ink = st.ink;
@@ -188,6 +191,7 @@
       ],
       names: { first: 'name1', last: 'name2', sex: 'sex' },
       decor: ['stripes', 'slashes', 'barcode', 'edge', 'chip', 'dna', 'mrz'],
+      mark: { ch: 'C', x: 1040, y: 505, size: 660 },
 
       draw(ctx, k, { gfx, st, doc }) {
         const ink = st.ink;
@@ -379,6 +383,7 @@
       // the left panel adds a toggle per license (S.doc.licenses)
       licenses: true,
       decor: ['stripes', 'slashes', 'barcode', 'edge'],
+      mark: { ch: 'L', x: 1030, y: 505, size: 660 },
 
       draw(ctx, k, { gfx, st, doc }) {
         const ink = st.ink;

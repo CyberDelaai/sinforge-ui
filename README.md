@@ -13,7 +13,8 @@ client-side; your images are never uploaded.
 ## Features
 
 - **Blanks** — pick a pre-defined document from the icon bar above the canvas, each icon showing its
-  shape (silhouette + photo window); everything else is filled in on top
+  shape (silhouette + solid photo window) and a letter (E — event badge,
+  C — citizen ID, L — license card); everything else is filled in on top
   of it. **EVENT BADGE** (1200×1600 vertical con badge), **CITIZEN ID**
   (1600×1010 horizontal ID card, CR80 proportions: issuer band, photo, labelled
   data fields, contact chip, a DNA strip seeded by the holder's fields —
