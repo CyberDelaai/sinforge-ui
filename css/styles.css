@@ -325,7 +325,22 @@
   .lic-pen.active, .lic-pen:hover { color: var(--accent); border-color: var(--accent); }
   .lic-pen:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
   @media (hover: none) { .lic-pen { opacity: 1; } }
-  .lic-editor { margin-top: 10px; }
+  /* reset: the same tab on the top-left corner, for customised licenses only */
+  .lic-reset { right: auto; left: -5px; }
+  .lic-cell:not(.custom) .lic-reset { display: none; }
+  .lic-pen.lic-reset:hover, .lic-pen.lic-reset.stage-pen { color: var(--magenta); border-color: var(--magenta); }
+  /* license editor window: the icon (a grant / revoke toggle) beside its fields */
+  .config.lic-box { width: min(460px, calc(100vw - 32px)); padding: 20px; --aug-border-bg: rgba(var(--accent-rgb),0.45); }
+  .lic-edit { display: flex; gap: 16px; align-items: flex-start; }
+  .lic-side { flex: 0 0 104px; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+  .blank-opt.lic-preview { width: 104px; height: 104px; padding: 12px; }
+  .blank-opt.lic-preview.on { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(var(--accent-rgb),0.45); }
+  .lic-name {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: 'Quantico', sans-serif; font-size: 13px; letter-spacing: 1px; color: var(--main);
+  }
+  .lic-fields { flex: 1; min-width: 0; }
+  @media (max-width: 420px) { .lic-edit { flex-direction: column; align-items: stretch; } }
 
   /* crop window (ported from commlink-ui's crop modal) */
   .modal-overlay {

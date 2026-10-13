@@ -26,9 +26,13 @@ client-side; your images are never uploaded.
   cyberware. Granted licenses print as solid tiles, the rest outlined and
   faded; toggle them in the left panel or click a tile on the card. Any
   license can be made your own: hover its icon in the left panel (or its tile
-  on the card) and click the pencil to give it a custom caption and upload a custom icon (printed in one
+  on the card) and click the pencil: an editor window opens to give it a custom
+  caption and upload a custom icon (printed in one
   colour — a transparent PNG or a dark icon on a light background works best;
-  kept in your browser). The upload opens a crop window: a square frame
+  kept in your browser; with the window open you can also drop or paste the
+  image). A customised license also shows a reset button on its icon's other
+  corner (in the left panel and on the card) that restores the built-in icon
+  and caption. The upload opens a crop window: a square frame
   (drag it, resize from the corner or with the wheel) with guides showing the
   standard icon size — a dashed safe square, centre lines and a ghost of the
   built-in icon. FIT sizes the frame so the icon fills the safe square (it
