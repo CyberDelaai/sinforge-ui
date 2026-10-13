@@ -57,8 +57,8 @@ TAGLINES = {
     'zh': ('身份证', '生成器', '适用于跑团与 LARP'),
 }
 # JS run in the layout page before the app loads (LANG = language code)
-SETUP_JS = """// the CITIZEN ID blank, full-colour doggo photo (the default halftone muddies
-  // at thumbnail size), and a metatype that admits it's a dog. kinda.
+SETUP_JS = """// the CITIZEN ID blank, full-colour doggo photo (pinned in case a 1-bit effect
+  // becomes the default — it muddies at thumbnail size), and a metatype that admits it's a dog. kinda.
   localStorage.setItem('sinforge:blank', 'citizen-id');
   localStorage.setItem('sinforge:style', JSON.stringify({ photoFx: 'none' }));
   localStorage.setItem('sinforge:doc', JSON.stringify({ metatype: 'HUMAN?' }));

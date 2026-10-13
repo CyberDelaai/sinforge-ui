@@ -70,7 +70,7 @@ SINFORGE.newStyle = () => ({
   dnaText: false,  // the DNA strip as a letter sequence instead of the helix (click it on the stage)
   mrz: true,       // machine-readable zone along the bottom (citizen ID)
   // photo effect: 'none' | 'mono' (threshold) | 'halftone' | 'dither'
-  photoFx: 'halftone',
+  photoFx: 'none',
   photoLevel: 50,  // threshold / brightness bias, 0..100
   photoDot: 10,    // halftone cell size, px at 1x
   // watermark: covers the card background only (under every element, never
