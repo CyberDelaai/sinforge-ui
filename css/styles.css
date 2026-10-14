@@ -287,7 +287,8 @@
   /* the bar over the stage holding the blank picker */
   .blank-bar { display: flex; align-items: center; gap: 14px; }
   .bar-label { font-size: 10px; letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; }
-  .blank-bar .blank-opt, .frame-pop .blank-opt { width: 46px; height: 52px; padding: 5px; }
+  .blank-bar .blank-opt { width: 46px; height: 52px; padding: 5px; }
+  .frame-pop .blank-opt { width: 58px; height: 66px; padding: 7px; }
   .blank-opt {
     width: 56px; height: 64px; padding: 6px; line-height: 0; cursor: pointer;
     background: var(--panel); color: rgba(var(--main-rgb),0.55);
@@ -332,7 +333,7 @@
   .lic-cell:not(.custom) .lic-reset { display: none; }
   .lic-pen.lic-reset:hover, .lic-pen.lic-reset.stage-pen { color: var(--magenta); border-color: var(--magenta); }
   /* license editor window: the icon (a grant / revoke toggle) beside its fields */
-  .config.lic-box { width: min(460px, calc(100vw - 32px)); padding: 20px; --aug-border-bg: rgba(var(--accent-rgb),0.45); }
+  .config.lic-box { width: min(500px, calc(100vw - 32px)); }
   .lic-edit { display: flex; gap: 16px; align-items: flex-start; }
   .lic-side { flex: 0 0 104px; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
   .blank-opt.lic-preview { width: 104px; height: 104px; padding: 12px; }
@@ -350,10 +351,9 @@
     background: rgba(0,0,0,0.75); backdrop-filter: blur(2px);
   }
   .modal-overlay[hidden] { display: none; }
-  .config.crop-box { width: min(540px, calc(100vw - 32px)); padding: 20px; --aug-border-bg: rgba(var(--accent-rgb),0.45); }
-  .crop-box h2 { color: var(--accent); letter-spacing: 3px; }
+  .config.crop-box { width: min(580px, calc(100vw - 32px)); }
   .crop-stage {
-    position: relative; width: 100%; height: min(360px, 55vh); overflow: hidden; user-select: none;
+    position: relative; width: 100%; height: min(400px, 58vh); overflow: hidden; user-select: none;
     background: #000; border: 1px solid rgba(var(--main-rgb),0.25); touch-action: none;
   }
   .crop-stage canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
@@ -516,19 +516,18 @@
     vector-effect: non-scaling-stroke; stroke-dasharray: 8 6; animation: hover-march 0.8s linear infinite;
   }
   @keyframes hover-march { to { stroke-dashoffset: -14; } }
-  .frame-pop {
-    position: absolute; z-index: 41; width: auto;
-    --aug-border-bg: rgba(var(--accent-rgb),0.45);
-    box-shadow: 0 0 30px rgba(0,0,0,0.6);
-  }
+  /* the stage's pickers pop up beside the click (app.js keeps them inside the
+     stage shell); a narrow stage wraps their tiles */
+  .frame-pop { position: absolute; z-index: 41; width: auto; max-width: calc(100% - 16px); }
   .frame-pop[hidden] { display: none; }
-  .frame-pop .blank-pick { flex-wrap: nowrap; }
+  .frame-pop .blank-pick { gap: 10px; }
   /* date format picker: the blank picker's tiles, as text rows showing a sample date */
   .date-pick { display: grid; grid-template-columns: repeat(2, auto); gap: 8px; }
   .blank-opt.date-opt {
     width: auto; height: auto; padding: 7px 12px; line-height: 1.2;
     font-family: 'Quantico', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 1px;
   }
+  .frame-pop .blank-opt.date-opt { width: auto; height: auto; padding: 10px 16px; font-size: 16px; }
   .doc-canvas.dragging { cursor: grabbing; }
 
   /* EFFECTS / WATERMARK / PHOTO FX windows (EIDOLON's stage-tool + .adj-pop): the
@@ -570,25 +569,40 @@
   .stage.digital .digi-bg { display: block; position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none; }
   .stage.digital .doc-canvas { filter: drop-shadow(0 0 10px rgba(var(--digi-rgb),0.45)) drop-shadow(0 0 28px rgba(var(--digi-rgb),0.18)); }
 
-  .adj-pop {
-    position: absolute; top: 0; right: calc(100% + 22px); z-index: 40;
-    --aug-border-bg: rgba(var(--accent-rgb),0.45);
-    box-shadow: 0 0 30px rgba(0,0,0,0.6);
-  }
+  /* a bit wider than the column it floats over, spilling into the gap / page margin */
+  .adj-pop { position: absolute; top: 0; right: calc(100% + 12px); z-index: 40; width: 360px; }
   .adj-pop[hidden] { display: none; }
   /* the DIGITAL window opens from the right edge: floats over the right column */
-  .adj-pop-r { right: auto; left: calc(100% + 22px); }
-  .modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-  .modal-head h2 { margin: 0; color: var(--accent); }
-  .adj-close {
-    background: none; border: none; cursor: pointer; padding: 0 4px;
-    color: var(--dim); font-family: 'JetBrains Mono', monospace; font-size: 20px; line-height: 1;
+  .adj-pop-r { right: auto; left: calc(100% + 12px); }
+
+  /* every pop-up window (stage pickers, EFFECTS / WATERMARK / PHOTO FX /
+     DIGITAL, license editor, crop): a full-accent frame on a lifted panel with
+     an inner glow (augmented-ui's clip-path cuts outer shadows away), a
+     divided title bar and a framed close button; they fade in */
+  .frame-pop, .adj-pop, .config.lic-box, .config.crop-box {
+    padding: 18px 20px 22px; background: var(--panel-2);
+    --aug-border-all: 2px; --aug-border-bg: var(--accent); --aug-tl: 14px; --aug-br: 14px;
+    box-shadow: inset 0 0 32px rgba(var(--accent-rgb),0.10);
+    animation: pop-in .14s ease-out;
   }
-  .adj-close:hover { color: var(--magenta); }
+  @keyframes pop-in { from { opacity: 0; transform: translateY(-6px); } }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid rgba(var(--accent-rgb),0.3);
+  }
+  .config .modal-head h2, .config.crop-box h2 { margin: 0; font-size: 15px; letter-spacing: 3px; color: var(--accent); }
+  .config.crop-box h2 { margin-bottom: 14px; }
+  .adj-close {
+    flex-shrink: 0; width: 28px; height: 28px; padding: 0; display: grid; place-items: center;
+    background: none; border: 1px solid rgba(var(--main-rgb),0.4); cursor: pointer;
+    color: var(--main); font-family: 'JetBrains Mono', monospace; font-size: 20px; line-height: 1;
+    transition: color .12s, border-color .12s;
+  }
+  .adj-close:hover, .adj-close:focus-visible { color: var(--magenta); border-color: var(--magenta); outline: none; }
 
   @media (max-width: 1100px) {
     .config-col { width: 100%; }
     /* no column beside the stage: drop the window inside it, under the icons */
-    .config.adj-pop { top: 134px; right: auto; left: 8px; width: min(340px, calc(100% - 16px)); }
+    .config.adj-pop { top: 134px; right: auto; left: 8px; width: min(360px, calc(100% - 16px)); }
     .config.adj-pop-r { top: 50px; left: auto; right: 8px; }
   }

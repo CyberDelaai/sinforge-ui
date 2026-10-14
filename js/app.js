@@ -1032,6 +1032,7 @@
     Object.entries(STAGE_POPS).forEach(([h, id]) => { if (h !== hit || !e) $(id).hidden = true; });
     if (!hit || !e) return;
     const pop = $(STAGE_POPS[hit]);
+    pop.style.left = pop.style.top = '0px'; // measure it at full width, not squeezed by its last spot
     pop.hidden = false;
     const sh = $('stageShell').getBoundingClientRect();
     const x = clamp(e.clientX - sh.left + 14, 8, sh.width - pop.offsetWidth - 8);
@@ -1190,9 +1191,12 @@
     });
     const anyOpen = () => document.querySelector('.adj-pop:not([hidden])');
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && anyOpen()) setPopOpen(null); });
-    // stays open while working on the canvas; a press anywhere else closes it
+    // a press anywhere outside the open window closes it (its icon toggles it)
     document.addEventListener('pointerdown', (e) => {
-      if (anyOpen() && !$('stageShell').contains(e.target)) setPopOpen(null);
+      const pop = anyOpen();
+      if (!pop || pop.contains(e.target)) return;
+      if (e.target.closest(`.stage-tool[aria-controls="${pop.id}"]`)) return;
+      setPopOpen(null);
     });
   }
 
