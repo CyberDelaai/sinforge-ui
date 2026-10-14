@@ -95,6 +95,9 @@ SINFORGE.newStyle = () => ({
   wmAmt: 15,       // potency (opacity), %
   wmScale: 100,    // size of the text / tiles / image, % of the default
   wmRot: -30,      // rotation in degrees, -180..180 (negative = counter-clockwise)
+  wmOverlap: 0,    // density: how far the repeated marks close in on each other, % (-100 = twice the gaps)
+  wmShift: 50,     // shift: each tile row's sideways shift from the one above, % of a tile
+  wmX: 0, wmY: 0,  // its offset from the card centre, fractions of the card (stage drag)
   wmTone: 'ink',   // colour: 'ink' | 'accent' | 'custom' (then wmColor)
   wmColor: '#7a7a88',
   wmTint: true,    // image mode: recolour the image in the tone

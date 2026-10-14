@@ -796,10 +796,14 @@
   }
 
   // ---- generic control binding (data-style / data-val / data-needs) ----
+  // conditions that aren't a single style key
+  const DERIVED = {
+    wmTiled: (st) => st.wm === 'text' || (st.wm === 'image' && st.wmTile), // a repeated watermark
+  };
   function needsMet(expr) {
     const m = expr.match(/^(\w+)(?:([=!])(\w+))?$/);
     if (!m) return true;
-    const v = S.style[m[1]];
+    const v = DERIVED[m[1]] ? DERIVED[m[1]](S.style) : S.style[m[1]];
     if (!m[2]) return !!v;
     return m[2] === '=' ? String(v) === m[3] : String(v) !== m[3];
   }
@@ -967,6 +971,23 @@
     if (licenseAt(p)) return 'license';
     return dateAt(p) ? 'date' : null;
   }
+  // point in polygon (even-odd ray cast)
+  function inPoly(p, pts) {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i], [xj, yj] = pts[j];
+      if ((yi > p.y) !== (yj > p.y) && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // an empty part of the card (no click target, not in a punched hole) drags
+  // the watermark — while one is drawn
+  function onWatermark(p) {
+    const st = S.style, B = blank();
+    if (st.wm === 'off' || !st.wmAmt) return false;
+    if (st.wm === 'text' ? !st.wmText.trim() : !S.wmImage) return false;
+    return inPoly(p, B.outline) && !(B.holes || []).some((h) => inPoly(p, h));
+  }
   // each click target's picker (the DNA strip has none: a click flips it
   // between the helix and the letters; nor a license tile: a click grants /
   // revokes it; nor the logo slot: a click on an empty one opens the logo
@@ -1023,12 +1044,14 @@
     const cv = $('docCanvas');
     let drag = null;
     cv.addEventListener('pointerdown', (e) => {
-      const p = docPoint(e), hit = hitAt(p);
+      const p = docPoint(e), hit = hitAt(p) || (onWatermark(p) && 'wm');
       if (!hit) return;
       // a press that barely moves is a click (its picker); more drags the photo
+      const [tx, ty] = hit === 'logo' ? [S.style.logoX, S.style.logoY]
+        : hit === 'wm' ? [S.style.wmX, S.style.wmY] : [S.tf.x, S.tf.y];
       drag = {
         hit, lic: hit === 'license' && licenseAt(p).key, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY,
-        tx: hit === 'logo' ? S.style.logoX : S.tf.x, ty: hit === 'logo' ? S.style.logoY : S.tf.y, moved: false,
+        tx, ty, moved: false,
       };
       cv.setPointerCapture(e.pointerId);
     });
@@ -1044,9 +1067,20 @@
         };
         if (!hit && (near($('licPenStage')) || near($('licResetStage')))) return;
         showHover(hit, p);
+        const wm = !hit && onWatermark(p);
+        cv.classList.toggle('over-wm', wm);
+        if (wm) cv.title = t('hint_wmmove');
         return;
       }
       if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 5) return;
+      if (drag.hit === 'wm') {
+        if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); }
+        const B = blank();
+        S.style.wmX = clamp(drag.tx + (p.x - drag.x) / B.w, -1, 1);
+        S.style.wmY = clamp(drag.ty + (p.y - drag.y) / B.h, -1, 1);
+        requestRender();
+        return;
+      }
       const logo = drag.hit === 'logo';
       if (logo ? !S.logo : drag.hit !== 'photo' || !S.photo) return;
       if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(null); }
@@ -1067,7 +1101,8 @@
       const { hit, moved, lic } = drag;
       drag = null;
       cv.classList.remove('dragging');
-      if (moved) (hit === 'logo' ? persist.style : persist.tf)();
+      if (moved) (hit === 'logo' || hit === 'wm' ? persist.style : persist.tf)();
+      else if (hit === 'wm') closeStagePops();
       else if (hit === 'dna') {
         closeStagePops();
         S.style.dnaText = !S.style.dnaText;
@@ -1081,10 +1116,20 @@
       } else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
+    // a double-click on an empty part of the card centres the watermark again
+    cv.addEventListener('dblclick', (e) => {
+      const p = docPoint(e);
+      if (hitAt(p) || !onWatermark(p)) return;
+      S.style.wmX = S.style.wmY = 0;
+      persist.style(); requestRender();
+    });
     // the pencil / reset sit over the canvas: moving onto one keeps the
     // hover, leaving it for anywhere but the canvas ends it
     const pen = $('licPenStage'), rst = $('licResetStage');
-    cv.addEventListener('pointerleave', (e) => { if (!drag && !pen.contains(e.relatedTarget) && !rst.contains(e.relatedTarget)) showHover(null); });
+    cv.addEventListener('pointerleave', (e) => {
+      cv.classList.remove('over-wm');
+      if (!drag && !pen.contains(e.relatedTarget) && !rst.contains(e.relatedTarget)) showHover(null);
+    });
     [pen, rst].forEach((b) => b.addEventListener('pointerleave', (e) => { if (e.relatedTarget !== cv) showHover(null); }));
     pen.innerHTML = PEN_SVG;
     pen.title = t('b_licedit');

@@ -511,7 +511,7 @@
   // background. Text tiles diagonally across the card; an image tiles in a
   // staggered grid or sits centred, optionally recoloured in the tone (ink /
   // accent / custom colour). wmScale sizes and wmRot turns all of them
-  // (around the card centre). ----
+  // (around the card centre, moved by wmX / wmY — the stage's drag). ----
   // The watermark image as drawn: tinted to the tone (a silhouette — colours
   // are replaced, so INVERT doesn't apply), or inverted, or as uploaded.
   let wmSrcCache = { key: '', canvas: null };
@@ -539,6 +539,11 @@
     return c;
   }
 
+  // SHIFT: each tile row is shifted sideways from the one above by wmShift %
+  // of a tile (50 = brick, 0 = straight columns); the fraction of a tile a row
+  // sits at, kept in 0..1 (the column loops cover one extra tile for it)
+  const rowShift = (row, st) => (((row * st.wmShift) / 100) % 1 + 1) % 1;
+
   function drawWatermark(ctx, B, st) {
     if (st.wm === 'off' || !st.wmAmt) return;
     if (st.wm === 'text' && !st.wmText.trim()) return;
@@ -555,11 +560,15 @@
     ctx.globalAlpha = st.wmAmt / 100;
     const tone = st.wmTone === 'accent' ? st.accent : st.wmTone === 'custom' ? st.wmColor : st.ink;
     const sc = st.wmScale / 100;
+    // OVERLAP: the repeated marks' spacing, closed in (or opened up) by wmOverlap %
+    const dens = 1 - st.wmOverlap / 100;
 
     // everything below is drawn around the card centre, already rotated; the
-    // tiled patterns cover the card's diagonal so no rotation leaves a gap
-    const diag = Math.hypot(B.w, B.h);
-    ctx.translate(B.w / 2, B.h / 2);
+    // tiled patterns cover the card's diagonal (plus the offset) so no
+    // rotation or drag leaves a gap
+    const ox = st.wmX * B.w, oy = st.wmY * B.h;
+    const diag = Math.hypot(B.w, B.h) + 2 * Math.hypot(ox, oy);
+    ctx.translate(B.w / 2 + ox, B.h / 2 + oy);
     ctx.rotate((st.wmRot * Math.PI) / 180);
 
     if (st.wm === 'text') {
@@ -568,10 +577,13 @@
       setSpacing(ctx, 6 * sc);
       ctx.fillStyle = tone;
       ctx.textBaseline = 'middle';
-      const unit = ctx.measureText(text + '   ').width;
-      for (let row = 0, y = -diag / 2; y < diag / 2; y += 110 * sc, row++) {
-        const off = (row % 2) * unit / 2;
-        for (let x = -diag / 2 - unit + off; x < diag / 2; x += unit) ctx.fillText(text, x, y);
+      ctx.textAlign = 'center';
+      // rows and columns centred on the origin: a large mark stays centred
+      const unit = ctx.measureText(text + '   ').width * dens, step = 110 * sc * dens;
+      const rows = Math.ceil(diag / 2 / step), cols = Math.ceil(diag / 2 / unit) + 1;
+      for (let row = -rows; row <= rows; row++) {
+        const off = rowShift(row, st) * unit;
+        for (let col = -cols; col <= cols; col++) ctx.fillText(text, col * unit + off, row * step);
       }
       setSpacing(ctx, 0);
     } else {
@@ -582,10 +594,12 @@
       ctx.imageSmoothingQuality = 'high';
       if (st.wmTile) {
         const f = Math.min(170 / src.width, 170 / src.height) * sc;
-        const w = src.width * f, h = src.height * f, step = 240 * sc;
-        for (let row = 0, y = -diag / 2; y < diag / 2 + step; y += step * 0.75, row++) {
-          for (let x = -diag / 2 - (row % 2 ? 0 : step / 2); x < diag / 2 + step; x += step) {
-            ctx.drawImage(src, x - w / 2, y - h / 2, w, h);
+        const w = src.width * f, h = src.height * f, step = 240 * sc * dens;
+        const rows = Math.ceil(diag / 2 / (step * 0.75)) + 1, cols = Math.ceil(diag / 2 / step) + 1;
+        for (let row = -rows; row <= rows; row++) {
+          const off = rowShift(row, st) * step;
+          for (let col = -cols; col <= cols; col++) {
+            ctx.drawImage(src, col * step + off - w / 2, row * step * 0.75 - h / 2, w, h);
           }
         }
       } else {

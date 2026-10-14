@@ -506,6 +506,7 @@
     width: auto; height: auto; object-fit: contain; touch-action: none;
   }
   .doc-canvas.over-photo { cursor: pointer; }
+  .doc-canvas.over-wm { cursor: grab; } /* an empty part of the card drags the watermark */
   /* photo window marker: shown while the pointer is over the photo, so it
      reads as clickable (opens the frame picker) */
   .photo-hover { position: absolute; pointer-events: none; overflow: visible; display: none; }

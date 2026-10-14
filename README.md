@@ -79,9 +79,13 @@ client-side; your images are never uploaded.
   print the photo in the ink colour and let the card colour show through.
 - **Watermark** — opened from the second icon at the stage's top-left corner. Text (repeated diagonally) or an uploaded image (tiled or
   one centred, optionally tinted), with a tone (ink / accent / custom colour),
-  scale and potency sliders and a rotation wheel (Shift snaps to 15°,
+  scale (up to 1000 %), overlap (density of the repeated marks: higher packs
+  them closer, negative spreads them out), shift (each repeated row's sideways shift from
+  the one above, % of a tile: 50 = brick, 0 = straight columns) and potency
+  sliders and a rotation wheel (Shift snaps to 15°,
   double-click resets). Images can be colour-inverted and use a SMART blend:
-  multiply on light cards, screen (lighten) on dark ones.
+  multiply on light cards, screen (lighten) on dark ones. While it's on, drag
+  any empty part of the card to move it; double-click there to centre it again.
   It marks the card background only: every element sits on top of it and the
   photo window stays clean.
 - **DIGITAL mode** — the icon at the stage's top-right corner opens the
