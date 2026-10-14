@@ -181,6 +181,7 @@
   .side-switch[data-pos="left"] .lab.l,
   .side-switch[data-pos="right"] .lab.r { color: var(--main); }
   .fx-toggle.disabled { opacity: .4; pointer-events: none; }
+  .fx-toggle[hidden] { display: none; }
 
   /* faded-edge cyan horizontal divider between config sections */
   .divider {

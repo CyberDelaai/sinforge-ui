@@ -3,6 +3,7 @@
   // ---- Blank library: SINFORGE.blanks[key] = one pre-defined document.
   //   w, h      native size in px (the 1x export); 2x doubles it
   //   outline   card silhouette, a clockwise polygon — outside it the PNG is transparent
+  //   holes     optional polygons punched out of it (a lanyard slot), transparent too
   //   portrait  { box, cut, line }: where the photo sits (its bounding box, which
   //             the framing drag / zoom works in), the frame's corner-cut size and
   //             line width; the window's shape comes from the selected portrait
@@ -83,6 +84,50 @@
   const licPortrait = (st) => ({
     box: { x: 157, y: 230, w: 380, h: (st.barcode ? LIC_CODE_TOP - 32 : LIC_BOTTOM) - 230 }, cut: 60, line: 14,
   });
+
+  // Round-cornered cards (the operator ID, the access pass): SINFORGE.gfx is
+  // defined by js/render.js, which loads before this file.
+  const RR = (x, y, w, h, r) => SINFORGE.gfx.roundRect(x, y, w, h, r);
+  const OP_OUTLINE = RR(40, 40, 1520, 930, 60);
+  const OP_PORTRAIT = { box: { x: 100, y: 176, w: 420, h: 564 }, cut: 60, line: 14 };
+  const PASS_OUTLINE = RR(40, 40, 920, 1520, 56);
+  const PASS_SLOT = RR(370, 92, 260, 56, 28);
+  // The access pass's photo grows by PASS_GROW when the code is off (the
+  // sections spread out to fill the rest).
+  const PASS_GROW = 200;
+  const passPortrait = (st) => ({ box: { x: 100, y: 210, w: 380, h: 480 + (st.barcode ? 0 : PASS_GROW) }, cut: 56, line: 14 });
+
+  // Right-aligned gfx.text: the right edge at x. Returns the drawn width.
+  const rtext = (gfx, ctx, str, x, y, o) => {
+    if (!str) return 0;
+    gfx.fitFont(ctx, str, o.weight || 700, o.size, o.maxW || 1e9, o.spacing || 0);
+    const w = ctx.measureText(str).width;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+    return gfx.text(ctx, str, x - w, y, o);
+  };
+  // Greedy word wrap at the current font: up to `max` lines no wider than maxW.
+  const wrap = (ctx, str, maxW, max) => {
+    const lines = [];
+    let line = '';
+    str.split(/\s+/).filter(Boolean).forEach((w) => {
+      const t = line ? line + ' ' + w : w;
+      if (line && ctx.measureText(t).width > maxW) { lines.push(line); line = w; } else line = t;
+    });
+    if (line) lines.push(line);
+    return lines.slice(0, max);
+  };
+  // Outer edge line + inner contour, shared by the round-cornered cards.
+  const contour = (gfx, ctx, st, outline) => {
+    if (st.edge) {
+      gfx.poly(ctx, outline);
+      ctx.strokeStyle = st.ink; ctx.lineWidth = 10; ctx.lineJoin = 'round';
+      ctx.stroke();
+    }
+    gfx.poly(ctx, gfx.inset(outline, 22));
+    ctx.strokeStyle = st.ink; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.lineJoin = 'miter';
+  };
 
   const blanks = {
     'event-badge': {
@@ -473,8 +518,256 @@
         field('LICENSE NO.', doc.licenseNo, X, y, 480);
       },
     },
+
+    // Horizontal operator ID (CR80 proportions, rounded corners): a dot-matrix
+    // strip over the photo, call sign + position on the right, a status tick
+    // box, the code + a hatched bar over the card type, and an inverted
+    // organisation band along the bottom carrying the fine print. Everything
+    // keeps 38 clear of the inner contour (x 100..1500, y 100..910).
+    'operator-id': {
+      w: 1600, h: 1010,
+      outline: OP_OUTLINE,
+      portrait: OP_PORTRAIT,
+      get photo() { return SINFORGE.frameWindow(this.portrait); },
+      texts: [
+        { id: 'callsign', label: 'f_callsign', max: 16 },
+        { id: 'position', label: 'f_position', max: 18 },
+        { id: 'opStatus', label: 'f_opstatus', max: 40 },
+        { id: 'number', label: 'f_idno', max: 16, gen: 'serial' },
+        { id: 'cardType', label: 'f_cardtype', max: 24 },
+        { id: 'org', label: 'f_org', max: 24 },
+        { id: 'division', label: 'f_division', max: 32 },
+      ],
+      decor: ['stripes', 'slashes', 'barcode', 'edge'],
+      mark: { ch: 'O', x: 1070, y: 450, size: 600 },
+
+      draw(ctx, k, { gfx, st, doc }) {
+        const ink = st.ink;
+        const X = 620, R = 1500;   // the right column's edges
+        const TOP = 176, BOT = 740; // the photo's top / bottom: the right column spans them
+        contour(gfx, ctx, st, OP_OUTLINE);
+
+        // dot matrix over the photo: two rows of grouped dots, seeded by the
+        // ID number (some of the second row dropped, the odd one in the accent)
+        const r = gfx.rng(gfx.hash(String(doc.number) + '|' + doc.callsign));
+        [110, 138].forEach((y) => {
+          let x = 105;
+          [6, 5, 4, 4].forEach((n) => {
+            for (let i = 0; i < n; i++, x += 24) {
+              if (y > 110 && r() < 0.3) continue;
+              ctx.fillStyle = r() < 0.05 ? st.accent : ink;
+              ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+            }
+            x += 30;
+          });
+        });
+
+        // photo, clipped to its window, then the portrait frame
+        gfx.portrait(ctx, this.photo, k, st);
+
+        // call sign + position, each under a caption (captions are part of the
+        // printed document, so they stay in English), laid out from the
+        // caption's cap top at the photo's top
+        const CAP = 28, CAP_GAP = 18, ROW_GAP = 40;
+        const capA = gfx.ascent(ctx, 'H', 400, CAP);
+        const cap = (t, y) => gfx.text(ctx, t, X, y, { size: CAP, color: ink, weight: 400, spacing: 0.12 });
+        let y = TOP + capA;
+        cap('CALL SIGN', y);
+        y += CAP_GAP + gfx.ascent(ctx, 'H', 700, 100);
+        gfx.text(ctx, doc.callsign, X, y, { size: 100, maxW: R - X, color: ink, spacing: 0.02 });
+        y += ROW_GAP + capA;
+        cap('POSITION', y);
+        y += CAP_GAP + gfx.ascent(ctx, 'H', 700, 76);
+        gfx.text(ctx, doc.position, X, y, { size: 76, maxW: R - X, color: ink, spacing: 0.02 });
+        const ruleY = y + 28;
+        ctx.fillStyle = ink;
+        ctx.fillRect(X, ruleY, R - X, 4);
+
+        // status tick box (an accent cross) beside the status + ID lines
+        const tb = ruleY + 28;
+        ctx.strokeStyle = ink; ctx.lineWidth = 4;
+        ctx.strokeRect(X + 2, tb, 40, 40);
+        ctx.strokeStyle = st.accent; ctx.lineWidth = 5; ctx.lineCap = 'square';
+        ctx.beginPath();
+        ctx.moveTo(X + 11, tb + 9); ctx.lineTo(X + 33, tb + 31);
+        ctx.moveTo(X + 33, tb + 9); ctx.lineTo(X + 11, tb + 31);
+        ctx.stroke();
+        ctx.lineCap = 'butt';
+        const small = { size: 24, maxW: R - X - 66, color: ink, weight: 400, spacing: 0.08 };
+        gfx.text(ctx, doc.opStatus, X + 66, tb + 16, small);
+        gfx.text(ctx, doc.number ? 'ID ' + doc.number : '', X + 66, tb + 44, small);
+
+        // the code at the bottom-left of the right column, its bottom level
+        // with the photo's: a 2D code as a square filling the room under the
+        // tick box, a linear one as a strip; the hatched bar + card type take
+        // the rest of the row, right-aligned
+        const sq = SINFORGE.codeSquare(st);
+        const sqTop = tb + 40 + 40;
+        let left = X;
+        if (st.barcode) {
+          const box = sq ? { x: X, y: sqTop, w: BOT - sqTop, h: BOT - sqTop } : { x: X, y: BOT - 92, w: 380, h: 92 };
+          gfx.code(ctx, k, box, doc.number, st);
+          left = box.x + box.w + 40;
+        }
+        if (st.slashes) {
+          ctx.fillStyle = ink;
+          for (let x = Math.max(left, R - 500); x + 14 <= R; x += 13) gfx.slant(ctx, x, BOT - 92, BOT - 64, 5, 9);
+        }
+        rtext(gfx, ctx, doc.cardType, R, BOT, { size: 50, maxW: R - left, color: ink, spacing: 0.04 });
+
+        // organisation band: solid ink, stepped down at the right, the text in
+        // the card colour; twin bars lead it when the stripes are on
+        const B0 = 778, B1 = 910, STEP = B0 + 50;
+        gfx.poly(ctx, [[100, B0], [900, B0], [950, STEP], [R, STEP], [R, B1], [100, B1]]);
+        ctx.fillStyle = ink;
+        ctx.fill();
+        let tx = 130;
+        if (st.stripes) {
+          ctx.fillStyle = st.card;
+          ctx.fillRect(124, B0 + 20, 10, B1 - B0 - 40);
+          ctx.fillRect(144, B0 + 20, 10, B1 - B0 - 40);
+          tx = 180;
+        }
+        gfx.text(ctx, doc.org, tx, B0 + 68, { size: 62, maxW: 880 - tx, color: st.card, spacing: 0.03 });
+        gfx.text(ctx, doc.division, tx, B1 - 20, { size: 30, maxW: 880 - tx, color: st.card, weight: 400, spacing: 0.08 });
+        // the fine print: three right-aligned lines in the band's step, shrunk
+        // until the whole text fits them
+        const org = String(doc.org || '').trim() || 'THE ISSUER';
+        const fine = `THIS CREDENTIAL REMAINS THE PROPERTY OF ${org} AND MUST BE SURRENDERED UPON TERMINATION OF CONTRACT OR UPON REQUEST BY AUTHORIZED PERSONNEL`;
+        let FINE = 17, lines;
+        for (;; FINE--) {
+          ctx.font = `400 ${FINE}px ${SINFORGE.const.FONT}`;
+          lines = wrap(ctx, fine, R - 1000, 4);
+          if (lines.length <= 3 || FINE <= 10) break;
+        }
+        lines.slice(0, 3).forEach((line, i) => rtext(gfx, ctx, line, R - 20, B1 - 64 + i * 22, { size: FINE, color: st.card, weight: 400 }));
+      },
+    },
+
+    // Vertical hanging access pass (rounded corners, a lanyard slot punched
+    // through the top): photo + the logo slot over the reference ID and
+    // expiry, a big access level, two small fields, a rule, the holder's
+    // handle and name, and the code with the issuer at the bottom.
+    // Everything keeps 38 clear of the inner contour (x 100..900, y ..1500).
+    'access-pass': {
+      w: 1000, h: 1600,
+      outline: PASS_OUTLINE,
+      holes: [PASS_SLOT],
+      // a getter: the window grows when the code is off
+      get portrait() { return passPortrait(SINFORGE.state.style); },
+      get photo() { return SINFORGE.frameWindow(this.portrait); },
+      texts: [
+        { id: 'access', label: 'f_access', max: 16 },
+        { id: 'number', label: 'f_refid', max: 16, gen: 'serial' },
+        { id: 'expires', label: 'f_expires', max: 10, gen: 'expiry', date: true },
+        { id: 'zone', label: 'f_zone', max: 28 },
+        { id: 'division', label: 'f_division', max: 32 },
+        { id: 'handle', label: 'f_handle', max: 24 },
+        { id: 'name1', label: 'f_given', max: 24 },
+        { id: 'name2', label: 'f_surname', max: 18 },
+        { id: 'org', label: 'f_org', max: 24 },
+      ],
+      names: { first: 'name1', last: 'name2' },
+      // the left panel adds the LOGO section (S.logo, drawn by gfx.logo)
+      logo: true,
+      decor: ['slashes', 'barcode', 'edge'],
+      mark: { ch: 'A', x: 500, y: 1150, size: 560 },
+
+      draw(ctx, k, { gfx, st, doc }) {
+        const ink = st.ink;
+        const X = 100, X2 = 540, R = 900, BOT = 1500;
+        const P = this.portrait.box, PB = P.y + P.h; // the photo's bottom
+        contour(gfx, ctx, st, PASS_OUTLINE);
+
+        // the slot's rim (half of the line falls inside the hole, clipped away)
+        gfx.poly(ctx, PASS_SLOT);
+        ctx.strokeStyle = ink; ctx.lineWidth = 10;
+        ctx.stroke();
+
+        // photo, clipped to its window, then the portrait frame
+        gfx.portrait(ctx, this.photo, k, st);
+
+        // type scale: captions over values, laid out by cap heights
+        const CAP = 24, CAP_GAP = 14;
+        const capA = gfx.ascent(ctx, 'H', 400, CAP);
+        const capH = (size, w) => gfx.ascent(ctx, 'H', w || 700, size);
+        const cap = (t, x, y, maxW) => gfx.text(ctx, t, x, y, { size: CAP, maxW, color: ink, weight: 400, spacing: 0.12 });
+
+        // reference ID + expiry beside the photo, the expiry level with its
+        // bottom; the logo slot fills the room above them
+        const VAL = 40, ROW_GAP = 22;
+        const expBase = PB, expCap = expBase - capH(VAL) - CAP_GAP;
+        const refBase = expCap - capA - ROW_GAP, refCap = refBase - capH(VAL) - CAP_GAP;
+        cap('REFERENCE ID', X2, refCap, R - X2);
+        gfx.text(ctx, doc.number, X2, refBase, { size: VAL, maxW: R - X2, color: ink, spacing: 0.04 });
+        cap('VALID THRU', X2, expCap, R - X2);
+        gfx.date(ctx, doc.expires, X2, expBase, { size: VAL, maxW: R - X2, color: ink, spacing: 0.04 }, st);
+        gfx.logo(ctx, k, { x: X2, y: P.y, w: R - X2, h: refCap - capA - 40 - P.y }, st);
+
+        // the gap between sections: 64, or with no code (the issuer row alone at
+        // the bottom) whatever lands that row on the bottom margin
+        const ORG = 40; // the issuer's size
+        const rowH = capH(ORG) + 20 + capA; // the issuer row: issuer, caption
+        const stack = capH(100) + 44 + capA + CAP_GAP + capH(30, 400) + 36 // access .. rule
+          + 36 + capH(30, 400) + 18 + capH(100); // rule .. name
+        const SEC = st.barcode ? 64 : (BOT - rowH - PB - stack) / 2;
+
+        // access level, then two small fields and a rule
+        let y = PB + SEC + capH(100);
+        gfx.text(ctx, doc.access, X, y, { size: 100, maxW: R - X, color: ink, spacing: 0.04 });
+        y += 44 + capA;
+        cap('ZONE', X, y, X2 - X - 30);
+        cap('DIVISION', X2, y, R - X2);
+        y += CAP_GAP + capH(30, 400);
+        const small = (t, x, maxW) => gfx.text(ctx, t, x, y, { size: 30, maxW, color: ink, weight: 400, spacing: 0.06 });
+        small(doc.zone, X, X2 - X - 30);
+        small(doc.division, X2, R - X2);
+        y += 36;
+        ctx.fillStyle = ink;
+        ctx.fillRect(X, y, R - X, 3);
+
+        // holder: the handle in the accent colour over the full name
+        y += 36 + capH(30, 400);
+        gfx.text(ctx, doc.handle, X, y, { size: 30, maxW: R - X, color: st.accent, weight: 400, spacing: 0.06 });
+        y += 18 + capH(100);
+        const name = [doc.name1, doc.name2].filter(Boolean).join(' ');
+        gfx.text(ctx, name, X, y, { size: 100, maxW: R - X, color: ink, spacing: 0.04 });
+
+        // the bottom: the issuer (+ a caption and the slashes) with the code.
+        //   2D code   a square in the bottom-left corner, the issuer beside it
+        //             at its top, the slashes level with its bottom
+        //   linear    the issuer row across the top, the slashes trailing the
+        //             caption, the barcode as a full-width strip under them
+        //   no code   the issuer row anchored to the bottom
+        const top = y + SEC;
+        const sq = st.barcode && SINFORGE.codeSquare(st), lin = st.barcode && !sq;
+        const SL = 30; // the slashes' height
+        const slashes = (x, yb) => {
+          if (!st.slashes) return;
+          ctx.fillStyle = ink;
+          for (let i = 0; i < 3; i++, x += 30) gfx.slant(ctx, x, yb - SL, yb, 14, 18);
+          gfx.slant(ctx, x + 6, yb - SL, yb, R - x - 6 - 18, 18);
+        };
+        if (sq) {
+          const s = BOT - top;
+          gfx.code(ctx, k, { x: X, y: top, w: s, h: s }, doc.number, st);
+          const ox = X + s + 50, orgBase = top + capH(ORG);
+          gfx.text(ctx, doc.org, ox, orgBase, { size: ORG, maxW: R - ox, color: ink, spacing: 0.03 });
+          cap('AUTHORIZED PERSONNEL ONLY', ox, orgBase + 20 + capA, R - ox);
+          slashes(ox, BOT);
+        } else {
+          // the row: issuer, then the caption with the slashes beside it
+          const rowTop = lin ? top : BOT - rowH;
+          const orgBase = rowTop + capH(ORG), capBase = rowTop + rowH;
+          gfx.text(ctx, doc.org, X, orgBase, { size: ORG, maxW: R - X, color: ink, spacing: 0.03 });
+          const cw = cap('AUTHORIZED PERSONNEL ONLY', X, capBase, X2 - X - 40);
+          slashes(Math.max(X2, X + cw + 40), capBase);
+          if (lin) gfx.code(ctx, k, { x: X, y: capBase + 40, w: R - X, h: BOT - capBase - 40 }, doc.number, st);
+        }
+      },
+    },
   };
 
   SINFORGE.blanks = blanks;
-  SINFORGE.blankOrder = ['event-badge', 'citizen-id', 'license'];
+  SINFORGE.blankOrder = ['event-badge', 'citizen-id', 'license', 'operator-id', 'access-pass'];
 })(window.SINFORGE);

@@ -43,6 +43,29 @@
     ctx.closePath();
   };
 
+  // Trace the card silhouette: the blank's outline plus any `holes` (punched
+  // slots) — fill / clip it with 'evenodd' so the holes stay transparent.
+  gfx.card = function card(ctx, B) {
+    ctx.beginPath();
+    [B.outline].concat(B.holes || []).forEach((pts) => {
+      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.closePath();
+    });
+  };
+
+  // A rounded rectangle as a clockwise polygon (each corner an 8-step arc), for
+  // blanks with round-cornered outlines.
+  gfx.roundRect = function roundRect(x, y, w, h, r) {
+    const pts = [];
+    [[x + w - r, y + r, -90], [x + w - r, y + h - r, 0], [x + r, y + h - r, 90], [x + r, y + r, 180]].forEach(([cx, cy, a0]) => {
+      for (let i = 0; i <= 8; i++) {
+        const a = (a0 + i * 90 / 8) * Math.PI / 180;
+        pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+      }
+    });
+    return pts;
+  };
+
   // Offset a simple polygon inward by d (positive = inward for a clockwise
   // polygon in screen space): shift each edge along its normal, then intersect
   // neighbouring edges. Fine for the chamfered card shapes the blanks use.
@@ -184,6 +207,59 @@
       if (sh.fill) { ctx.fillStyle = sh.fill === 'accent' ? st.accent : st.ink; ctx.fill(); }
       if (sh.l || sh.stroke) ctx.stroke();
     });
+  };
+
+  // An image as a one-colour alpha mask (black, w × h): its own alpha when it
+  // has transparency, else its luminance, the glyph being whichever side
+  // differs from the border (dark on light or light on dark).
+  gfx.mask = function mask(src, w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.drawImage(src, 0, 0, w, h);
+    const im = x.getImageData(0, 0, w, h), d = im.data;
+    const luma = (i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    let clear = 0, edge = 0, edgeN = 0;
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      if (d[i + 3] < 250) clear++;
+      const px = p % w, py = (p - px) / w;
+      if (px === 0 || py === 0 || px === w - 1 || py === h - 1) { edge += luma(i); edgeN++; }
+    }
+    const byAlpha = clear > w * h * 0.05, darkGlyph = edge / edgeN >= 128;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = luma(i);
+      d[i + 3] = byAlpha ? d[i + 3] : Math.min(255, Math.max(0, ((darkGlyph ? 255 - l : l) - 40) * 1.4));
+      d[i] = d[i + 1] = d[i + 2] = 0;
+    }
+    x.putImageData(im, 0, 0);
+    return c;
+  };
+
+  // The uploaded logo (S.logo) contained in `box`, aligned to its top-left:
+  // in the ink colour (a gfx.mask, filled) when st.logoTint, else in its own
+  // colours. The box is kept in gfx.logoBox (native px) — the stage's click
+  // target, logo or not. The tinted logo is cached by source, colour and size.
+  let logoCache = { id: '', c: null };
+  gfx.logo = function logo(ctx, k, box, st) {
+    gfx.logoBox = box;
+    const src = S.logo;
+    if (!src) return;
+    const f = Math.min(box.w / src.width, box.h / src.height);
+    const w = src.width * f, h = src.height * f;
+    let img = src;
+    if (st.logoTint) {
+      const pw = Math.max(1, Math.round(w * k)), ph = Math.max(1, Math.round(h * k));
+      const id = [src.__id, st.ink, pw, ph].join('|');
+      if (logoCache.id !== id) {
+        const c = gfx.mask(src, pw, ph), x = c.getContext('2d');
+        x.globalCompositeOperation = 'source-in';
+        x.fillStyle = st.ink;
+        x.fillRect(0, 0, pw, ph);
+        logoCache = { id, c };
+      }
+      img = logoCache.c;
+    }
+    ctx.drawImage(img, box.x, box.y, w, h);
   };
 
   // A license icon (js/licenses.js) as a canvas at device pixels, in one colour;
@@ -521,24 +597,25 @@
       ctx.save();
       ctx.shadowColor = st.accent;
       ctx.shadowBlur = (st.glowAmt / 100) * 60 * k;
-      gfx.poly(ctx, B.outline);
+      gfx.card(ctx, B);
       ctx.fillStyle = st.card;
-      for (let i = 0; i < 2; i++) ctx.fill();
+      for (let i = 0; i < 2; i++) ctx.fill('evenodd');
       ctx.restore();
     }
 
     // card body, then everything else clipped to it
-    gfx.poly(ctx, B.outline);
+    gfx.card(ctx, B);
     ctx.fillStyle = st.card;
-    ctx.fill();
+    ctx.fill('evenodd');
     ctx.save();
-    gfx.poly(ctx, B.outline);
-    ctx.clip();
+    gfx.card(ctx, B);
+    ctx.clip('evenodd');
 
     drawWatermark(ctx, B, st);
     gfx.codeBox = null; // set again by gfx.code if the blank draws a barcode
     gfx.dnaBox = null;  // set by a blank that draws a DNA strip (its click target)
     gfx.chipBox = null; // set by gfx.chip
+    gfx.logoBox = null; // set by gfx.logo
     gfx.dateBoxes = []; // filled by gfx.date
     gfx.licenseBoxes = []; // filled by gfx.license
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });

@@ -47,6 +47,17 @@ SINFORGE.newDoc = () => ({
   licenseNo: 'LIC-7731-0304',
   licenses: ['firearms', 'driver', 'medic', 'detective'], // granted keys (js/licenses.js)
   licCaps: {},     // custom captions by license key (a tile's own text replaces its built-in one)
+  // operator ID (org / division shared with the access pass)
+  callsign: 'GHOST-7',
+  position: 'OPERATOR',
+  opStatus: 'TOUR ACTIVE // TIER 2 CLEARANCE',
+  cardType: 'OPERATOR ID CARD',
+  org: 'GHOST SYNDICATE',
+  division: 'GLOBAL OPERATIONS',
+  // access pass
+  access: 'ALL-ACCESS',
+  zone: 'SECTOR 7 // ALL LEVELS',
+  handle: '@CYBERDOGGO',
 });
 
 // Default look: colours, decorations, photo + card effects.
@@ -60,6 +71,8 @@ SINFORGE.newStyle = () => ({
   chipType: 'contact',
   // date format the date slots print in: key into SINFORGE.dateFormats (js/dates.js)
   dateFmt: 'iso',
+  // the uploaded logo (a blank with a logo slot): in the ink colour, or its own colours
+  logoTint: true,
   // decorations (on/off)
   stripes: true,   // hazard stripe columns along the side recesses
   slashes: true,   // slanted bars after the badge number
@@ -124,5 +137,6 @@ SINFORGE.state = {
   photo: null,                    // source canvas of the photo (user upload in IndexedDB, else the doggo)
   photoIsUser: false,             // true when the photo came from the user
   wmImage: null,                  // source canvas of the watermark image (IndexedDB 'watermark')
+  logo: null,                     // source canvas of the logo (IndexedDB 'logo')
   licIcons: {},                   // custom license icons by key: one-colour masks (IndexedDB 'lic:<key>')
 };

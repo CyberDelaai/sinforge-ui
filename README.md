@@ -14,7 +14,7 @@ client-side; your images are never uploaded.
 
 - **Blanks** — pick a pre-defined document from the icon bar above the canvas, each icon showing its
   shape (silhouette + solid photo window) and a letter (E — event badge,
-  C — citizen ID, L — license card); everything else is filled in on top
+  C — citizen ID, L — license card, O — operator ID, A — access pass); everything else is filled in on top
   of it. **EVENT BADGE** (1200×1600 vertical con badge), **CITIZEN ID**
   (1600×1010 horizontal ID card, CR80 proportions: issuer band, photo, labelled
   data fields, contact chip, a DNA strip seeded by the holder's fields —
@@ -37,11 +37,25 @@ client-side; your images are never uploaded.
   standard icon size — a dashed safe square, centre lines and a ghost of the
   built-in icon. FIT sizes the frame so the icon fills the safe square (it
   opens that way), MAX takes the whole image; the frame may run past the
-  image to give a tight picture room. RESET brings back the built-in one).
+  image to give a tight picture room. RESET brings back the built-in one),
+  **OPERATOR ID** (1600×1010, rounded corners: a seeded dot-matrix strip over
+  the photo, call sign and position, a status tick box, the code beside a
+  hatched bar over the card type — a QR / 2D code as a square, a barcode as a
+  strip — and an inverted organisation band carrying the fine print) and
+  **ACCESS PASS** (1000×1600 vertical hanging badge with a lanyard slot punched
+  through — transparent in the PNG: photo beside your own logo (LOGO in the
+  left panel, or click its slot on the card; printed in the ink colour or in
+  its own colours), reference ID and expiry, a big access level, zone and
+  division, the holder's handle and name, and the organisation with the code:
+  a QR / 2D code sits square in the corner beside it, a barcode runs full
+  width under it, and with the code off the photo grows instead).
 - **Text** — event badge: badge number, vertical role tag, title, two-line
   name, footer line. Citizen ID: issuer, SIN number, given names, surname, sex,
   metatype (HUMAN, ELF, ORK…, with a random-metatype die), date of birth, expiry (both with a random-date die), district, status.
   License card: authority, license number, given names, surname, date of birth, expiry.
+  Operator ID: call sign, position, status line, ID number, card type,
+  organisation, division. Access pass: access level, reference ID, expiry,
+  zone, division, handle, given names, surname, organisation.
   Long text shrinks to fit its slot. The die button next to the badge number
   generates a random serial in one of 5 formats (`#92-0329`, `SIN-2950-0982`,
   `NZ-4085-Z`, `C4:16:F4:79`, `NMS/22137`).

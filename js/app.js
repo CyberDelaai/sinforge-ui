@@ -143,6 +143,21 @@
       SINFORGE.idb.put('assets', 'watermark', file).catch(() => {});
     }).catch(() => setStatus(t('st_badimg'), 'warn'));
   }
+  // ---- logo (a blank with a logo slot; kept in IndexedDB as 'logo') ----
+  function loadLogo(file) {
+    if (!file || !/^image\//.test(file.type)) { setStatus(t('st_badimg'), 'warn'); return; }
+    blobToCanvas(file).then((c) => {
+      S.logo = c;
+      requestRender();
+      setStatus(t('st_logo'), 'ok');
+      SINFORGE.idb.put('assets', 'logo', file).catch(() => {});
+    }).catch(() => setStatus(t('st_badimg'), 'warn'));
+  }
+  function restoreLogo() {
+    return SINFORGE.idb.get('assets', 'logo')
+      .then((blob) => blob && blobToCanvas(blob).then((c) => { S.logo = c; requestRender(); }))
+      .catch(() => {});
+  }
   function restoreWatermark() {
     return SINFORGE.idb.get('assets', 'watermark')
       .then((blob) => blob && blobToCanvas(blob).then((c) => { S.wmImage = c; requestRender(); }))
@@ -158,7 +173,7 @@
     const pad = Math.max(B.w, B.h) * 0.02;
     const m = B.mark;
     return `<svg viewBox="${-pad} ${-pad} ${B.w + 2 * pad} ${B.h + 2 * pad}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">`
-      + `<polygon class="bi-card" points="${pts(B.outline)}"/>`
+      + `<path class="bi-card" fill-rule="evenodd" d="${[B.outline].concat(B.holes || []).map((h) => 'M' + pts(h) + 'Z').join('')}"/>`
       + `<polygon class="bi-photo" points="${pts(B.photo.poly)}"/>`
       + (m ? `<text class="bi-letter" x="${m.x}" y="${m.y}" font-size="${m.size}" text-anchor="middle" dominant-baseline="central">${m.ch}</text>` : '')
       + '</svg>';
@@ -409,6 +424,7 @@
       if (blank().names && slot.id === blank().names.last) box.appendChild(buildNameGen());
     });
     if (blank().licenses) box.appendChild(buildLicensePick());
+    $('logoSec').hidden = !blank().logo;
   }
 
   // ---- license toggles (a blank with `licenses: true`): one icon per license,
@@ -450,32 +466,10 @@
     requestRender();
   }
 
-  // A custom icon as a one-colour alpha mask (longest edge `max`): images with
-  // real transparency keep their alpha; opaque ones are read by brightness,
-  // the glyph being whichever side differs from the border (dark on light or
-  // light on dark).
+  // A custom icon as a one-colour alpha mask (longest edge `max`; see gfx.mask)
   function iconMask(src, max) {
     const f = Math.min(1, max / Math.max(src.width, src.height));
-    const w = Math.max(1, Math.round(src.width * f)), h = Math.max(1, Math.round(src.height * f));
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const x = c.getContext('2d');
-    x.drawImage(src, 0, 0, w, h);
-    const im = x.getImageData(0, 0, w, h), d = im.data;
-    const luma = (i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    let clear = 0, edge = 0, edgeN = 0;
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-      if (d[i + 3] < 250) clear++;
-      const px = p % w, py = (p - px) / w;
-      if (px === 0 || py === 0 || px === w - 1 || py === h - 1) { edge += luma(i); edgeN++; }
-    }
-    const byAlpha = clear > w * h * 0.05, darkGlyph = edge / edgeN >= 128;
-    for (let i = 0; i < d.length; i += 4) {
-      const l = luma(i);
-      d[i + 3] = byAlpha ? d[i + 3] : clamp(((darkGlyph ? 255 - l : l) - 40) * 1.4, 0, 255);
-      d[i] = d[i + 1] = d[i + 2] = 0;
-    }
-    x.putImageData(im, 0, 0);
+    const c = SINFORGE.gfx.mask(src, Math.max(1, Math.round(src.width * f)), Math.max(1, Math.round(src.height * f)));
     c.__id = ++photoSeq; // icon cache key in render.js
     return c;
   }
@@ -913,6 +907,13 @@
       S.tf = SINFORGE.newTransform();
       persist.tf(); syncControls(); requestRender();
     });
+    $('logoUploadBtn').addEventListener('click', () => $('logoFileInput').click());
+    $('logoFileInput').addEventListener('change', (e) => { loadLogo(e.target.files[0]); e.target.value = ''; });
+    $('logoClearBtn').addEventListener('click', () => {
+      S.logo = null;
+      SINFORGE.idb.del('assets', 'logo').catch(() => {});
+      requestRender();
+    });
     $('wmUploadBtn').addEventListener('click', () => $('wmFileInput').click());
     $('wmFileInput').addEventListener('change', (e) => { loadWatermark(e.target.files[0]); e.target.value = ''; });
     $('wmClearBtn').addEventListener('click', () => {
@@ -949,22 +950,23 @@
   // the license tile under a point (as last rendered — gfx.licenseBoxes), or undefined
   const licenseAt = (p) => SINFORGE.gfx.licenseBoxes.find((b) => inBox(p, b));
   // what a point on the canvas hits: 'photo', 'code' (the barcode as last
-  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'date',
-  // 'license' or null
+  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'logo'
+  // (gfx.logoBox), 'date', 'license' or null
   function hitAt(p) {
     if (inPhoto(p)) return 'photo';
     if (inBox(p, SINFORGE.gfx.codeBox)) return 'code';
     if (inBox(p, SINFORGE.gfx.chipBox)) return 'chip';
     if (inBox(p, SINFORGE.gfx.dnaBox)) return 'dna';
+    if (inBox(p, SINFORGE.gfx.logoBox)) return 'logo';
     if (licenseAt(p)) return 'license';
     return dateAt(p) ? 'date' : null;
   }
   // each click target's picker (the DNA strip has none: a click flips it
   // between the helix and the letters; nor a license tile: a click grants /
-  // revokes it)
+  // revokes it; nor the logo slot: a click opens the logo upload)
   const STAGE_POPS = { photo: 'framePop', code: 'codePop', chip: 'chipPop', date: 'datePop' };
-  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna', license: 'hint_lic' };
-  const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna', license: 'hint_lic', logo: 'hint_logoslot' };
+  const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox', logo: 'logoBox' };
   // hover marker: the photo window's outline (or the barcode's / chip's /
   // the hovered date's / license tile's box) laid over the canvas; a license
   // tile also gets the edit pencil on its top-right corner and, when it's
@@ -1055,6 +1057,9 @@
       } else if (hit === 'license') {
         closeStagePops();
         toggleLicense(lic);
+      } else if (hit === 'logo') {
+        closeStagePops();
+        $('logoFileInput').click();
       } else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
@@ -1203,6 +1208,7 @@
       .catch(() => {}).then(requestRender);
     restorePhoto();
     restoreWatermark();
+    restoreLogo();
     restoreLicenseIcons();
   }
 
