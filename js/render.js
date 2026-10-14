@@ -235,17 +235,25 @@
     return c;
   };
 
-  // The uploaded logo (S.logo) contained in `box`, aligned to its top-left:
-  // in the ink colour (a gfx.mask, filled) when st.logoTint, else in its own
-  // colours. The box is kept in gfx.logoBox (native px) — the stage's click
-  // target, logo or not. The tinted logo is cached by source, colour and size.
+  // Where the logo lands in its slot `box`: contained in it at zoom 1, its
+  // top-left at the slot's, then scaled by st.logoZoom and moved by
+  // st.logoX / logoY (fractions of the slot) — the stage's drag / wheel set them.
+  gfx.logoRect = function logoRect(box, st, src) {
+    const f = Math.min(box.w / src.width, box.h / src.height) * st.logoZoom;
+    return { x: box.x + st.logoX * box.w, y: box.y + st.logoY * box.h, w: src.width * f, h: src.height * f };
+  };
+
+  // The uploaded logo (S.logo) in `box` (placed by gfx.logoRect, clipped to the
+  // slot): in the ink colour (a gfx.mask, filled) when st.logoTint, else in
+  // its own colours. The box is kept in gfx.logoBox (native px) — the stage's
+  // click / drag target, logo or not. The tinted logo is cached by source,
+  // colour and size.
   let logoCache = { id: '', c: null };
   gfx.logo = function logo(ctx, k, box, st) {
     gfx.logoBox = box;
     const src = S.logo;
     if (!src) return;
-    const f = Math.min(box.w / src.width, box.h / src.height);
-    const w = src.width * f, h = src.height * f;
+    const { x: lx, y: ly, w, h } = gfx.logoRect(box, st, src);
     let img = src;
     if (st.logoTint) {
       const pw = Math.max(1, Math.round(w * k)), ph = Math.max(1, Math.round(h * k));
@@ -259,7 +267,12 @@
       }
       img = logoCache.c;
     }
-    ctx.drawImage(img, box.x, box.y, w, h);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(box.x, box.y, box.w, box.h);
+    ctx.clip();
+    ctx.drawImage(img, lx, ly, w, h);
+    ctx.restore();
   };
 
   // A license icon (js/licenses.js) as a canvas at device pixels, in one colour;

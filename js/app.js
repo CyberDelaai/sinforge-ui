@@ -148,10 +148,15 @@
     if (!file || !/^image\//.test(file.type)) { setStatus(t('st_badimg'), 'warn'); return; }
     blobToCanvas(file).then((c) => {
       S.logo = c;
-      requestRender();
+      resetLogoTf();
       setStatus(t('st_logo'), 'ok');
       SINFORGE.idb.put('assets', 'logo', file).catch(() => {});
     }).catch(() => setStatus(t('st_badimg'), 'warn'));
+  }
+  // back to the logo's default placement: contained in its slot, top-left
+  function resetLogoTf() {
+    Object.assign(S.style, { logoX: 0, logoY: 0, logoZoom: 1 });
+    persist.style(); requestRender();
   }
   function restoreLogo() {
     return SINFORGE.idb.get('assets', 'logo')
@@ -912,8 +917,9 @@
     $('logoClearBtn').addEventListener('click', () => {
       S.logo = null;
       SINFORGE.idb.del('assets', 'logo').catch(() => {});
-      requestRender();
+      resetLogoTf();
     });
+    $('logoResetBtn').addEventListener('click', resetLogoTf);
     $('wmUploadBtn').addEventListener('click', () => $('wmFileInput').click());
     $('wmFileInput').addEventListener('change', (e) => { loadWatermark(e.target.files[0]); e.target.value = ''; });
     $('wmClearBtn').addEventListener('click', () => {
@@ -963,7 +969,8 @@
   }
   // each click target's picker (the DNA strip has none: a click flips it
   // between the helix and the letters; nor a license tile: a click grants /
-  // revokes it; nor the logo slot: a click opens the logo upload)
+  // revokes it; nor the logo slot: a click on an empty one opens the logo
+  // upload, a logo in it is dragged / wheel-zoomed like the photo)
   const STAGE_POPS = { photo: 'framePop', code: 'codePop', chip: 'chipPop', date: 'datePop' };
   const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna', license: 'hint_lic', logo: 'hint_logoslot' };
   const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox', logo: 'logoBox' };
@@ -974,7 +981,7 @@
   function showHover(hit, p) {
     const svg = $('photoHover'), pen = $('licPenStage'), rst = $('licResetStage');
     $('docCanvas').classList.toggle('over-photo', !!hit);
-    $('docCanvas').title = hit ? t(HINTS[hit]) : '';
+    $('docCanvas').title = hit ? t(hit === 'logo' && S.logo ? 'hint_logomove' : HINTS[hit]) : '';
     svg.classList.toggle('show', !!hit);
     pen.hidden = rst.hidden = hit !== 'license';
     if (!hit) return;
@@ -1019,7 +1026,10 @@
       const p = docPoint(e), hit = hitAt(p);
       if (!hit) return;
       // a press that barely moves is a click (its picker); more drags the photo
-      drag = { hit, lic: hit === 'license' && licenseAt(p).key, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, tx: S.tf.x, ty: S.tf.y, moved: false };
+      drag = {
+        hit, lic: hit === 'license' && licenseAt(p).key, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY,
+        tx: hit === 'logo' ? S.style.logoX : S.tf.x, ty: hit === 'logo' ? S.style.logoY : S.tf.y, moved: false,
+      };
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener('pointermove', (e) => {
@@ -1037,8 +1047,16 @@
         return;
       }
       if (!drag.moved && Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy) < 5) return;
-      if (drag.hit !== 'photo' || !S.photo) return;
+      const logo = drag.hit === 'logo';
+      if (logo ? !S.logo : drag.hit !== 'photo' || !S.photo) return;
       if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(null); }
+      if (logo) {
+        const b = SINFORGE.gfx.logoBox;
+        S.style.logoX = clamp(drag.tx + (p.x - drag.x) / b.w, -2, 2);
+        S.style.logoY = clamp(drag.ty + (p.y - drag.y) / b.h, -2, 2);
+        requestRender();
+        return;
+      }
       const b = blank().photo.box;
       S.tf.x = clamp(drag.tx + (p.x - drag.x) / b.w, -3, 3);
       S.tf.y = clamp(drag.ty + (p.y - drag.y) / b.h, -3, 3);
@@ -1049,7 +1067,7 @@
       const { hit, moved, lic } = drag;
       drag = null;
       cv.classList.remove('dragging');
-      if (moved) persist.tf();
+      if (moved) (hit === 'logo' ? persist.style : persist.tf)();
       else if (hit === 'dna') {
         closeStagePops();
         S.style.dnaText = !S.style.dnaText;
@@ -1059,7 +1077,7 @@
         toggleLicense(lic);
       } else if (hit === 'logo') {
         closeStagePops();
-        $('logoFileInput').click();
+        if (!S.logo) $('logoFileInput').click();
       } else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
@@ -1089,7 +1107,19 @@
     });
     window.addEventListener('resize', closeStagePops);
     cv.addEventListener('wheel', (e) => {
-      if (!inPhoto(docPoint(e)) || !S.photo) return;
+      const p = docPoint(e), lb = SINFORGE.gfx.logoBox;
+      if (S.logo && inBox(p, lb)) {
+        // zoom the logo about the point under the pointer
+        e.preventDefault();
+        const st = S.style, r0 = SINFORGE.gfx.logoRect(lb, st, S.logo);
+        const z = clamp(st.logoZoom * Math.exp(-e.deltaY * 0.0015), 0.2, 5), q = z / st.logoZoom;
+        st.logoZoom = z;
+        st.logoX = clamp((p.x - (p.x - r0.x) * q - lb.x) / lb.w, -2, 2);
+        st.logoY = clamp((p.y - (p.y - r0.y) * q - lb.y) / lb.h, -2, 2);
+        persist.style(); requestRender();
+        return;
+      }
+      if (!inPhoto(p) || !S.photo) return;
       e.preventDefault();
       S.tf.zoom = clamp(S.tf.zoom * Math.exp(-e.deltaY * 0.0015), 1, 5);
       persist.tf(); syncControls(); requestRender();
