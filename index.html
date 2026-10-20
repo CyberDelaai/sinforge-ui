@@ -1,4 +1,4 @@
-<!-- SINFORGE v1.0.5 -->
+<!-- SINFORGE v1.0.6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,8 +57,8 @@
   "browserRequirements": "Modern desktop browser",
   "url": "https://cyberdeck.tools/sinforge-ui/",
   "image": "https://cyberdeck.tools/sinforge-ui/previews/og-en.png",
-  "softwareVersion": "1.0.5",
-  "dateModified": "2026-10-14",
+  "softwareVersion": "1.0.6",
+  "dateModified": "2026-10-20",
   "keywords": "cyberpunk, id card generator, sin, badge maker, keycard, prop documents, ttrpg, larp, shadowrun, png export",
   "isAccessibleForFree": true,
   "author": {
@@ -97,7 +97,7 @@
         <a class="app-menu-item current" href="https://cyberdeck.tools/sinforge-ui/" aria-current="page">&gt; SINFORGE_</a>
       </nav>
     </div>
-    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">1.0.5</span></span></div>
+    <div class="tag"><span id="tagWord" class="glitchable" data-i18n="tag">DOCUMENT FORGE</span><span id="tagMeta" class="tag-meta"> // v<span id="tagVersion">1.0.6</span></span></div>
     <select class="lang-select" id="uiLangSel" aria-label="interface language"><option value="en">EN</option><option value="ru">RU</option><option value="fr">FR</option><option value="de">DE</option><option value="es">ES</option><option value="it">IT</option><option value="ja">JP</option><option value="zh">CN</option></select>
   </header>
 
@@ -127,6 +127,7 @@
         </div>
         <input type="file" id="logoFileInput" accept="image/*" hidden />
         <div class="fx-toggle"><span class="fx-label" data-i18n="l_logotint">PRINT IN INK</span><button class="side-switch" type="button" data-style="logoTint" data-pos="left"><span class="thumb"></span><span class="lab l" data-i18n="sw_off">OFF</span><span class="lab r" data-i18n="sw_on">ON</span></button></div>
+        <div class="fx-toggle" data-needs="logoTint"><span class="fx-label"><span data-i18n="l_threshold">THRESHOLD</span> <span class="val" data-val="logoThr"></span></span><input type="range" class="potency-slider" data-style="logoThr" min="0" max="100" step="1" /></div>
         <p class="hint mt" data-i18n="hint_logo">Click the empty logo slot on the card to upload one too; drag the logo to move it, scroll to zoom. In ink it prints in one colour: use a PNG with transparency, or a dark logo on a light background.</p>
       </div>
     </aside>

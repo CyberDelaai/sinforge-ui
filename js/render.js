@@ -209,10 +209,30 @@
     });
   };
 
+  // Otsu's threshold of a 256-bin histogram: the cut that best separates its
+  // two classes (maximum between-class variance).
+  function otsu(hist) {
+    let n = 0, sum = 0;
+    for (let v = 0; v < 256; v++) { n += hist[v]; sum += v * hist[v]; }
+    let wB = 0, sB = 0, best = 0, cut = 128;
+    for (let v = 0; v < 256; v++) {
+      wB += hist[v]; if (!wB) continue;
+      const wF = n - wB; if (!wF) break;
+      sB += v * hist[v];
+      const dm = sB / wB - (sum - sB) / wF, b = wB * wF * dm * dm;
+      if (b > best) { best = b; cut = v + 0.5; }
+    }
+    return cut;
+  }
+
   // An image as a one-colour alpha mask (black, w × h): its own alpha when it
   // has transparency, else its luminance, the glyph being whichever side
-  // differs from the border (dark on light or light on dark).
-  gfx.mask = function mask(src, w, h) {
+  // differs from the border (dark on light or light on dark). `thr` (0–100,
+  // optional) squeezes the tone ramp (40..222 at 0) toward the image's own
+  // glyph / background split (Otsu's threshold of the tone histogram): the
+  // glyph's tones go solid (a red logo on white or on black alike) and the
+  // background's drop out, 100 being a hard one-bit split.
+  gfx.mask = function mask(src, w, h, thr) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     const x = c.getContext('2d');
@@ -226,9 +246,20 @@
       if (px === 0 || py === 0 || px === w - 1 || py === h - 1) { edge += luma(i); edgeN++; }
     }
     const byAlpha = clear > w * h * 0.05, darkGlyph = edge / edgeN >= 128;
+    const tone = (i) => (byAlpha ? d[i + 3] : darkGlyph ? 255 - luma(i) : luma(i));
+    const q = Math.min(1, Math.max(0, (thr || 0) / 100));
+    let lo = 40, hi = 222;
+    if (q) {
+      const hist = new Float64Array(256);
+      for (let i = 0; i < d.length; i += 4) hist[Math.round(tone(i))]++;
+      const cut = Math.min(247, Math.max(8, otsu(hist))), s = 1 - (1 - q) * (1 - q);
+      lo += (cut - 1 - lo) * s;
+      hi = Math.max(lo + 2, hi - (hi - cut - 1) * s);
+    }
+    const gain = 255 / (hi - lo);
     for (let i = 0; i < d.length; i += 4) {
-      const l = luma(i);
-      d[i + 3] = byAlpha ? d[i + 3] : Math.min(255, Math.max(0, ((darkGlyph ? 255 - l : l) - 40) * 1.4));
+      const v = tone(i);
+      d[i + 3] = byAlpha && !q ? d[i + 3] : Math.min(255, Math.max(0, (v - lo) * gain));
       d[i] = d[i + 1] = d[i + 2] = 0;
     }
     x.putImageData(im, 0, 0);
@@ -244,7 +275,7 @@
   };
 
   // The uploaded logo (S.logo) in `box` (placed by gfx.logoRect, clipped to the
-  // slot): in the ink colour (a gfx.mask, filled) when st.logoTint, else in
+  // slot): in the ink colour (a gfx.mask cut at st.logoThr, filled) when st.logoTint, else in
   // its own colours. The box is kept in gfx.logoBox (native px) — the stage's
   // click / drag target, logo or not. The tinted logo is cached by source,
   // colour and size.
@@ -257,9 +288,9 @@
     let img = src;
     if (st.logoTint) {
       const pw = Math.max(1, Math.round(w * k)), ph = Math.max(1, Math.round(h * k));
-      const id = [src.__id, st.ink, pw, ph].join('|');
+      const id = [src.__id, st.ink, st.logoThr, pw, ph].join('|');
       if (logoCache.id !== id) {
-        const c = gfx.mask(src, pw, ph), x = c.getContext('2d');
+        const c = gfx.mask(src, pw, ph, st.logoThr), x = c.getContext('2d');
         x.globalCompositeOperation = 'source-in';
         x.fillStyle = st.ink;
         x.fillRect(0, 0, pw, ph);

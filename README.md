@@ -45,7 +45,9 @@ client-side; your images are never uploaded.
   **ACCESS PASS** (1000×1600 vertical hanging badge with a lanyard slot punched
   through — transparent in the PNG: photo beside your own logo (LOGO in the
   left panel, or click its empty slot on the card; drag it to move, scroll to
-  zoom, RESET puts it back; printed in the ink colour or in its own colours), reference ID and expiry, a big access level, zone and
+  zoom, RESET puts it back; printed in the ink colour — a THRESHOLD slider hardens it, mid tones
+  (a red logo) going solid and the background dropping out, up to a pure
+  one-bit print — or in its own colours), reference ID and expiry, a big access level, zone and
   division, the holder's handle and name, and the organisation with the code:
   a QR / 2D code sits square in the corner beside it, a barcode runs full
   width under it, and with the code off the photo grows instead).

@@ -73,6 +73,7 @@ SINFORGE.newStyle = () => ({
   dateFmt: 'iso',
   // the uploaded logo (a blank with a logo slot): in the ink colour, or its own colours
   logoTint: true,
+  logoThr: 0,         // in ink: threshold (0–100) — higher = mid tones solid, background gone
   logoX: 0, logoY: 0, // its offset in the slot, fractions of the slot (stage drag)
   logoZoom: 1,        // its scale, 1 = contained in the slot (stage wheel)
   // decorations (on/off)
