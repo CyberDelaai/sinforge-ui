@@ -56,8 +56,15 @@ client-side; your images are never uploaded.
   press Escape to let it go. The selected one's settings: SCALE, AMOUNT
   (opacity), PRINT IN INK (one colour — a THRESHOLD slider hardens it, mid
   tones (a red logo) going solid and the background dropping out, up to a
-  pure one-bit print — or its own colours), bring forward / send backward,
-  centre, remove (or Delete). A new logo lands in the blank's natural spot
+  pure one-bit print — or its own colours), crop, bring forward / send
+  backward, centre, remove (or Delete). Every new logo opens the crop window
+  right away (several uploads: one after another; CANCEL keeps the whole
+  image, and the kept part fills the logo's spot); CROP reopens it over the
+  whole uploaded image: drag any rectangle (Shift on the corner keeps its
+  shape), FIT hugs the logo's content (its transparency, or what differs from
+  a solid background), MAX takes the whole image; the kept part stays where
+  it was on the card. The original is kept, so a logo can be recropped any
+  time. A new logo lands in the blank's natural spot
   (beside the call sign on the operator ID, above the reference ID on the
   access pass) or the card's centre. PHOTO OVER LOGOS keeps every logo out of
   the photo window, so none shows through a transparent photo (a 1-bit photo

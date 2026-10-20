@@ -125,8 +125,8 @@ SINFORGE.newNames = () => ({
 // Default photo framing: offsets as fractions of the photo frame, zoom >= 1 (cover).
 SINFORGE.newTransform = () => ({ x: 0, y: 0, zoom: 1 });
 
-// A new logo layer (one uploaded image on one blank; its image is
-// S.logoImgs[id], kept in IndexedDB as 'logo:<id>'). Placement is relative to
+// A new logo layer (one uploaded image on one blank; the upload is
+// S.logoSrc[id], kept in IndexedDB as 'logo:<id>', its crop S.logoImgs[id]). Placement is relative to
 // the card (it scales with the export): x / y = its centre as fractions of the
 // card's width / height, size = the side of the square it fits in, as a
 // fraction of the card's shorter side.
@@ -137,6 +137,9 @@ SINFORGE.newLogo = (id) => ({
   alpha: 100,  // opacity, %
   tint: true,  // print in the ink colour (else its own colours)
   thr: 0,      // in ink: threshold (0–100) — higher = mid tones solid, background gone
+  // its crop: the part of the uploaded image it shows, in fractions of it (may
+  // run past it — transparent there); the upload is kept whole for a recrop
+  cx: 0, cy: 0, cw: 1, ch: 1,
 });
 
 // ---- Working-area state: the single source of mutable state. Every module
@@ -158,7 +161,8 @@ SINFORGE.state = {
   // logo layers per blank key, bottom first: SINFORGE.newLogo() entries,
   // drawn over the card + watermark, under every element (sinforge:logos)
   logos: {},
-  logoImgs: {},                   // their source canvases by layer id (IndexedDB 'logo:<id>')
+  logoSrc: {},                    // their uploaded images by layer id (IndexedDB 'logo:<id>')
+  logoImgs: {},                   // the same, cropped (what's drawn)
   logoSel: null,                  // the selected layer's id (the panel's editor + stage priority)
   licIcons: {},                   // custom license icons by key: one-colour masks (IndexedDB 'lic:<key>')
 };

@@ -354,7 +354,7 @@
   .lic-fields { flex: 1; min-width: 0; }
   @media (max-width: 420px) { .lic-edit { flex-direction: column; align-items: stretch; } }
 
-  /* crop window (ported from commlink-ui's crop modal) */
+  /* crop window (ported from commlink-ui's crop modal): license icons, logos */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.75); backdrop-filter: blur(2px);
@@ -602,8 +602,7 @@
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
     margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid rgba(var(--accent-rgb),0.3);
   }
-  .config .modal-head h2, .config.crop-box h2 { margin: 0; font-size: 15px; letter-spacing: 3px; color: var(--accent); }
-  .config.crop-box h2 { margin-bottom: 14px; }
+  .config .modal-head h2 { margin: 0; font-size: 15px; letter-spacing: 3px; color: var(--accent); }
   .adj-close {
     flex-shrink: 0; width: 28px; height: 28px; padding: 0; display: grid; place-items: center;
     background: none; border: 1px solid rgba(var(--main-rgb),0.4); cursor: pointer;

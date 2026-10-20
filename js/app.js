@@ -157,9 +157,10 @@
       SINFORGE.idb.put('assets', 'watermark', file).catch(() => {});
     }).catch(() => setStatus(t('st_badimg'), 'warn'));
   }
-  // ---- logo layers: S.logos[blank] (bottom first), each image in IndexedDB as
-  // 'logo:<id>'. The left panel lists the active blank's layers as thumbnails
-  // (a click selects one; the selected one's settings show below them) ----
+  // ---- logo layers: S.logos[blank] (bottom first), each upload in IndexedDB as
+  // 'logo:<id>' (kept whole: the layer's crop is replayed on it). The left
+  // panel lists the active blank's layers as thumbnails (a click selects one;
+  // the selected one's settings show below them) ----
   const layers = () => S.logos[S.blank] || (S.logos[S.blank] = []);
   const selLayer = () => (S.logos[S.blank] || []).find((L) => L.id === S.logoSel) || null;
   const newLogoId = () => 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -177,13 +178,59 @@
       L.y = Math.min(1, L.y + 0.03);
     }
   }
+  // the layer's upload (S.logoSrc) cut to its crop -> S.logoImgs (what's drawn)
+  const isWhole = (L) => !L.cx && !L.cy && L.cw === 1 && L.ch === 1;
+  function setLogoImage(L, src) {
+    if (src) S.logoSrc[L.id] = src;
+    src = S.logoSrc[L.id];
+    if (!src) return;
+    let c = src;
+    if (!isWhole(L)) {
+      c = SINFORGE.crop.apply(src, { x: L.cx, y: L.cy, w: L.cw, h: L.ch });
+      c.__id = ++photoSeq; // logo cache key in render.js
+    }
+    S.logoImgs[L.id] = c;
+  }
+  // CROP: the crop window over a layer's whole upload. A recrop starts from
+  // its current crop, and the kept part stays where it was on the card, at
+  // the same scale; a fresh upload (fresh) starts hugging its content, and
+  // the kept part fills the layer's spot. Resolves once the window closes.
+  function cropLogo(L, fresh) {
+    const src = L && S.logoSrc[L.id];
+    if (!src) return Promise.resolve();
+    return SINFORGE.crop.open(src, {
+      free: true, rect: fresh ? null : { x: L.cx, y: L.cy, w: L.cw, h: L.ch },
+      title: 'h_croplogo', hint: 'hint_croplogo', fitTitle: 't_fitlogo',
+    }).then((c) => {
+      if (!c || !Object.values(S.logos).some((ls) => ls.includes(L))) return;
+      const B = blank(), old = S.logoImgs[L.id], r0 = SINFORGE.gfx.logoRect(B, L, old);
+      const ppx = r0.w / old.width; // card px per cropped-image px
+      // the new crop's centre vs the old one's, in upload px -> card px
+      const dx = ((c.crop.x + c.crop.w / 2) - (L.cx + L.cw / 2)) * src.width * ppx;
+      const dy = ((c.crop.y + c.crop.h / 2) - (L.cy + L.ch / 2)) * src.height * ppx;
+      Object.assign(L, { cx: c.crop.x, cy: c.crop.y, cw: c.crop.w, ch: c.crop.h });
+      if (!fresh) {
+        L.size = Math.min(1.5, Math.max(0.05, Math.max(c.width, c.height) * ppx / Math.min(B.w, B.h)));
+        L.x += dx / B.w;
+        L.y += dy / B.h;
+      }
+      if (isWhole(L)) S.logoImgs[L.id] = src;
+      else { c.__id = ++photoSeq; S.logoImgs[L.id] = c; }
+      persist.logos();
+      buildLogoPick();
+      requestRender();
+    });
+  }
+  // each upload becomes a layer, then opens the crop window (several: one
+  // after another; CANCEL keeps the whole image)
   function addLogos(files) {
     const imgs = [...(files || [])].filter((f) => /^image\//.test(f.type));
     if (!imgs.length) { setStatus(t('st_badimg'), 'warn'); return; }
+    let queue = Promise.resolve();
     imgs.forEach((file) => blobToCanvas(file).then((c) => {
       const L = SINFORGE.newLogo(newLogoId());
       placeLogo(L);
-      S.logoImgs[L.id] = c;
+      setLogoImage(L, c);
       layers().push(L);
       S.logoSel = L.id;
       persist.logos();
@@ -191,11 +238,13 @@
       requestRender();
       setStatus(t('st_logo'), 'ok');
       SINFORGE.idb.put('assets', 'logo:' + L.id, file).catch(() => {});
+      queue = queue.then(() => cropLogo(L, true));
     }).catch(() => setStatus(t('st_badimg'), 'warn')));
   }
   function removeLogo(id) {
     Object.keys(S.logos).forEach((b) => { S.logos[b] = S.logos[b].filter((L) => L.id !== id); });
     delete S.logoImgs[id];
+    delete S.logoSrc[id];
     if (S.logoSel === id) S.logoSel = null;
     SINFORGE.idb.del('assets', 'logo:' + id).catch(() => {});
     persist.logos();
@@ -220,7 +269,7 @@
     Object.values(S.logos).forEach((ls) => ls.forEach((L) => {
       SINFORGE.idb.get('assets', 'logo:' + L.id).then((blob) => {
         if (!blob) { removeLogo(L.id); return; } // its image is gone
-        return blobToCanvas(blob).then((c) => { S.logoImgs[L.id] = c; buildLogoPick(); requestRender(); });
+        return blobToCanvas(blob).then((c) => { setLogoImage(L, c); buildLogoPick(); requestRender(); });
       }).catch(() => {});
     }));
     // the one logo of the slot-based version (IndexedDB 'logo'): a layer where
@@ -231,7 +280,7 @@
       return SINFORGE.idb.put('assets', 'logo:' + L.id, blob).then(() => {
         SINFORGE.idb.del('assets', 'logo').catch(() => {});
         return blobToCanvas(blob).then((c) => {
-          S.logoImgs[L.id] = c;
+          setLogoImage(L, c);
           (S.logos['access-pass'] = S.logos['access-pass'] || []).push(L);
           persist.logos(); buildLogoPick(); requestRender();
         });
@@ -308,6 +357,7 @@
       if (el.classList.contains('side-switch')) el.addEventListener('click', () => { const L = selLayer(); if (L) set(!L[key]); });
       else el.addEventListener('input', () => set(key === 'size' ? Number(el.value) / 100 : Number(el.value)));
     });
+    $('logoCropBtn').addEventListener('click', () => cropLogo(selLayer()));
     $('logoUpBtn').addEventListener('click', () => moveLogo(1));
     $('logoDownBtn').addEventListener('click', () => moveLogo(-1));
     $('logoCenterBtn').addEventListener('click', () => {
@@ -320,7 +370,7 @@
     // Delete / Backspace removes the selected layer, Escape lets go of it
     // (not while typing in a field)
     document.addEventListener('keydown', (e) => {
-      if (!S.logoSel || (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+      if (!S.logoSel || !$('cropModal').hidden || (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeLogo(S.logoSel); }
       else if (e.key === 'Escape') selectLogo(null);
     });
