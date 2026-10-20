@@ -71,11 +71,9 @@ SINFORGE.newStyle = () => ({
   chipType: 'contact',
   // date format the date slots print in: key into SINFORGE.dateFormats (js/dates.js)
   dateFmt: 'iso',
-  // the uploaded logo (a blank with a logo slot): in the ink colour, or its own colours
-  logoTint: true,
-  logoThr: 0,         // in ink: threshold (0–100) — higher = mid tones solid, background gone
-  logoX: 0, logoY: 0, // its offset in the slot, fractions of the slot (stage drag)
-  logoZoom: 1,        // its scale, 1 = contained in the slot (stage wheel)
+  // logo layers (S.logos): kept out of the photo window, so they never show
+  // through a transparent photo (a 1-bit photo FX, a PNG cut-out)
+  photoOverLogos: false,
   // decorations (on/off)
   stripes: true,   // hazard stripe columns along the side recesses
   slashes: true,   // slanted bars after the badge number
@@ -127,6 +125,20 @@ SINFORGE.newNames = () => ({
 // Default photo framing: offsets as fractions of the photo frame, zoom >= 1 (cover).
 SINFORGE.newTransform = () => ({ x: 0, y: 0, zoom: 1 });
 
+// A new logo layer (one uploaded image on one blank; its image is
+// S.logoImgs[id], kept in IndexedDB as 'logo:<id>'). Placement is relative to
+// the card (it scales with the export): x / y = its centre as fractions of the
+// card's width / height, size = the side of the square it fits in, as a
+// fraction of the card's shorter side.
+SINFORGE.newLogo = (id) => ({
+  id,
+  x: 0.5, y: 0.5,
+  size: 0.3,
+  alpha: 100,  // opacity, %
+  tint: true,  // print in the ink colour (else its own colours)
+  thr: 0,      // in ink: threshold (0–100) — higher = mid tones solid, background gone
+});
+
 // ---- Working-area state: the single source of mutable state. Every module
 // aliases it as `const S = SINFORGE.state;` and reads/writes S.<field>.
 // Persisted fields live in localStorage under `sinforge:*` keys; restore() in
@@ -143,6 +155,10 @@ SINFORGE.state = {
   photo: null,                    // source canvas of the photo (user upload in IndexedDB, else the doggo)
   photoIsUser: false,             // true when the photo came from the user
   wmImage: null,                  // source canvas of the watermark image (IndexedDB 'watermark')
-  logo: null,                     // source canvas of the logo (IndexedDB 'logo')
+  // logo layers per blank key, bottom first: SINFORGE.newLogo() entries,
+  // drawn over the card + watermark, under every element (sinforge:logos)
+  logos: {},
+  logoImgs: {},                   // their source canvases by layer id (IndexedDB 'logo:<id>')
+  logoSel: null,                  // the selected layer's id (the panel's editor + stage priority)
   licIcons: {},                   // custom license icons by key: one-colour masks (IndexedDB 'lic:<key>')
 };

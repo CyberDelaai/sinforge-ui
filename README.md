@@ -43,14 +43,25 @@ client-side; your images are never uploaded.
   hatched bar over the card type — a QR / 2D code as a square, a barcode as a
   strip — and an inverted organisation band carrying the fine print) and
   **ACCESS PASS** (1000×1600 vertical hanging badge with a lanyard slot punched
-  through — transparent in the PNG: photo beside your own logo (LOGO in the
-  left panel, or click its empty slot on the card; drag it to move, scroll to
-  zoom, RESET puts it back; printed in the ink colour — a THRESHOLD slider hardens it, mid tones
-  (a red logo) going solid and the background dropping out, up to a pure
-  one-bit print — or in its own colours), reference ID and expiry, a big access level, zone and
+  through — transparent in the PNG: photo beside room for a logo, reference ID and expiry, a big access level, zone and
   division, the holder's handle and name, and the organisation with the code:
   a QR / 2D code sits square in the corner beside it, a barcode runs full
   width under it, and with the code off the photo grows instead).
+- **Logos** — any number of your own logos on any blank (LOGOS in the left
+  panel, ADD LOGO takes several images at once), each blank keeping its own.
+  They're a background layer: over the card and the watermark, under every
+  element. Drag one anywhere on the card, scroll over it to resize; a click
+  selects it (dashed outline), and the selected logo is grabbed first even
+  where it lies under the photo or text — click an empty part of the card or
+  press Escape to let it go. The selected one's settings: SCALE, AMOUNT
+  (opacity), PRINT IN INK (one colour — a THRESHOLD slider hardens it, mid
+  tones (a red logo) going solid and the background dropping out, up to a
+  pure one-bit print — or its own colours), bring forward / send backward,
+  centre, remove (or Delete). A new logo lands in the blank's natural spot
+  (beside the call sign on the operator ID, above the reference ID on the
+  access pass) or the card's centre. PHOTO OVER LOGOS keeps every logo out of
+  the photo window, so none shows through a transparent photo (a 1-bit photo
+  FX, a PNG cut-out).
 - **Text** — event badge: badge number, vertical role tag, title, two-line
   name, footer line. Citizen ID: issuer, SIN number, given names, surname, sex,
   metatype (HUMAN, ELF, ORK…, with a random-metatype die), date of birth, expiry (both with a random-date die), district, status.

@@ -48,6 +48,7 @@
     tf: () => SINFORGE.save('sinforge:tf', JSON.stringify(S.tf)),
     out: () => SINFORGE.save('sinforge:out', JSON.stringify(S.out)),
     names: () => SINFORGE.save('sinforge:names', JSON.stringify(S.names)),
+    logos: () => SINFORGE.save('sinforge:logos', JSON.stringify(S.logos)),
   };
   function restore() {
     const b = (() => { try { return localStorage.getItem('sinforge:blank'); } catch (e) { return null; } })();
@@ -65,6 +66,18 @@
     Object.keys(S.doc.licCaps).forEach((key) => {
       if (!SINFORGE.licenses[key] || typeof S.doc.licCaps[key] !== 'string') delete S.doc.licCaps[key];
     });
+    // logo layers: { blank: [layer…] }, each merged over a fresh one
+    const logos = load('sinforge:logos');
+    if (logos && typeof logos === 'object' && !Array.isArray(logos)) {
+      Object.keys(logos).forEach((b) => {
+        if (!SINFORGE.blanks[b] || !Array.isArray(logos[b])) return;
+        S.logos[b] = logos[b].filter((L) => L && typeof L.id === 'string').map((L) => {
+          const n = SINFORGE.newLogo(L.id);
+          merge(n, L);
+          return n;
+        });
+      });
+    }
   }
 
   // ---- render scheduling: at most one preview render per frame ----
@@ -78,6 +91,7 @@
       if (cv.width !== B.w || cv.height !== B.h) { cv.width = B.w; cv.height = B.h; }
       SINFORGE.render(cv.getContext('2d'), 1);
       SINFORGE.digital.sync();
+      syncLogoMark();
     });
   }
 
@@ -143,25 +157,174 @@
       SINFORGE.idb.put('assets', 'watermark', file).catch(() => {});
     }).catch(() => setStatus(t('st_badimg'), 'warn'));
   }
-  // ---- logo (a blank with a logo slot; kept in IndexedDB as 'logo') ----
-  function loadLogo(file) {
-    if (!file || !/^image\//.test(file.type)) { setStatus(t('st_badimg'), 'warn'); return; }
-    blobToCanvas(file).then((c) => {
-      S.logo = c;
-      resetLogoTf();
+  // ---- logo layers: S.logos[blank] (bottom first), each image in IndexedDB as
+  // 'logo:<id>'. The left panel lists the active blank's layers as thumbnails
+  // (a click selects one; the selected one's settings show below them) ----
+  const layers = () => S.logos[S.blank] || (S.logos[S.blank] = []);
+  const selLayer = () => (S.logos[S.blank] || []).find((L) => L.id === S.logoSel) || null;
+  const newLogoId = () => 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  // a new layer lands in the blank's logo spot (gfx.logoSpot, as last
+  // rendered) or the card's centre, stepped aside off any layer already there
+  function placeLogo(L) {
+    const B = blank(), spot = SINFORGE.gfx.logoSpot;
+    if (spot) {
+      L.x = (spot.x + spot.w / 2) / B.w;
+      L.y = (spot.y + spot.h / 2) / B.h;
+      L.size = Math.min(spot.w, spot.h) / Math.min(B.w, B.h);
+    }
+    while (layers().some((o) => Math.abs(o.x - L.x) < 1e-3 && Math.abs(o.y - L.y) < 1e-3)) {
+      L.x = Math.min(1, L.x + 0.03);
+      L.y = Math.min(1, L.y + 0.03);
+    }
+  }
+  function addLogos(files) {
+    const imgs = [...(files || [])].filter((f) => /^image\//.test(f.type));
+    if (!imgs.length) { setStatus(t('st_badimg'), 'warn'); return; }
+    imgs.forEach((file) => blobToCanvas(file).then((c) => {
+      const L = SINFORGE.newLogo(newLogoId());
+      placeLogo(L);
+      S.logoImgs[L.id] = c;
+      layers().push(L);
+      S.logoSel = L.id;
+      persist.logos();
+      buildLogoPick();
+      requestRender();
       setStatus(t('st_logo'), 'ok');
-      SINFORGE.idb.put('assets', 'logo', file).catch(() => {});
-    }).catch(() => setStatus(t('st_badimg'), 'warn'));
+      SINFORGE.idb.put('assets', 'logo:' + L.id, file).catch(() => {});
+    }).catch(() => setStatus(t('st_badimg'), 'warn')));
   }
-  // back to the logo's default placement: contained in its slot, top-left
-  function resetLogoTf() {
-    Object.assign(S.style, { logoX: 0, logoY: 0, logoZoom: 1 });
-    persist.style(); requestRender();
+  function removeLogo(id) {
+    Object.keys(S.logos).forEach((b) => { S.logos[b] = S.logos[b].filter((L) => L.id !== id); });
+    delete S.logoImgs[id];
+    if (S.logoSel === id) S.logoSel = null;
+    SINFORGE.idb.del('assets', 'logo:' + id).catch(() => {});
+    persist.logos();
+    buildLogoPick();
+    requestRender();
   }
-  function restoreLogo() {
-    return SINFORGE.idb.get('assets', 'logo')
-      .then((blob) => blob && blobToCanvas(blob).then((c) => { S.logo = c; requestRender(); }))
-      .catch(() => {});
+  // restack the selected layer one step (dir +1 = forward, -1 = backward)
+  function moveLogo(dir) {
+    const ls = layers(), i = ls.findIndex((L) => L.id === S.logoSel), j = i + dir;
+    if (i < 0 || j < 0 || j >= ls.length) return;
+    [ls[i], ls[j]] = [ls[j], ls[i]];
+    persist.logos();
+    buildLogoPick();
+    requestRender();
+  }
+  function selectLogo(id) {
+    if (S.logoSel === id) return;
+    S.logoSel = id;
+    syncLogoEdit();
+  }
+  function restoreLogos() {
+    Object.values(S.logos).forEach((ls) => ls.forEach((L) => {
+      SINFORGE.idb.get('assets', 'logo:' + L.id).then((blob) => {
+        if (!blob) { removeLogo(L.id); return; } // its image is gone
+        return blobToCanvas(blob).then((c) => { S.logoImgs[L.id] = c; buildLogoPick(); requestRender(); });
+      }).catch(() => {});
+    }));
+    // the one logo of the slot-based version (IndexedDB 'logo'): a layer where
+    // the access pass's slot was
+    SINFORGE.idb.get('assets', 'logo').then((blob) => {
+      if (!blob) return;
+      const L = Object.assign(SINFORGE.newLogo(newLogoId()), { x: 0.72, y: 0.225, size: 0.3 });
+      return SINFORGE.idb.put('assets', 'logo:' + L.id, blob).then(() => {
+        SINFORGE.idb.del('assets', 'logo').catch(() => {});
+        return blobToCanvas(blob).then((c) => {
+          S.logoImgs[L.id] = c;
+          (S.logos['access-pass'] = S.logos['access-pass'] || []).push(L);
+          persist.logos(); buildLogoPick(); requestRender();
+        });
+      });
+    }).catch(() => {});
+  }
+
+  // the thumbnails (bottom first), from a small copy of each image
+  function logoThumb(c) {
+    if (!c.__thumb) {
+      const f = Math.min(1, 96 / Math.max(c.width, c.height)), tc = document.createElement('canvas');
+      tc.width = Math.max(1, Math.round(c.width * f));
+      tc.height = Math.max(1, Math.round(c.height * f));
+      tc.getContext('2d').drawImage(c, 0, 0, tc.width, tc.height);
+      c.__thumb = tc.toDataURL();
+    }
+    return c.__thumb;
+  }
+  function buildLogoPick() {
+    const box = $('logoPick');
+    box.innerHTML = '';
+    (S.logos[S.blank] || []).forEach((L, i) => {
+      const c = S.logoImgs[L.id];
+      if (!c) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt';
+      btn.dataset.layer = L.id;
+      btn.setAttribute('role', 'radio');
+      btn.title = '#' + (i + 1);
+      const img = document.createElement('img');
+      img.src = logoThumb(c);
+      img.alt = '#' + (i + 1);
+      btn.appendChild(img);
+      btn.onclick = () => selectLogo(S.logoSel === L.id ? null : L.id);
+      box.appendChild(btn);
+    });
+    if (S.logoSel && !selLayer()) S.logoSel = null;
+    syncLogoEdit();
+  }
+  // the selected layer's settings: [data-logo="<key>"] edits it (size in %),
+  // [data-logo-val] shows a value, [data-logo-needs] greys a row out
+  function syncLogoEdit() {
+    const L = selLayer();
+    $('logoPick').querySelectorAll('.blank-opt').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.layer === S.logoSel)));
+    $('logoEdit').hidden = !L;
+    syncLogoMark();
+    if (!L) return;
+    const val = (key) => (key === 'size' ? Math.round(L.size * 100) : L[key]);
+    $('logoEdit').querySelectorAll('[data-logo]').forEach((el) => {
+      const v = val(el.dataset.logo);
+      if (el.classList.contains('side-switch')) el.dataset.pos = v ? 'right' : 'left';
+      else if (el.value !== String(v)) el.value = v;
+    });
+    $('logoEdit').querySelectorAll('[data-logo-val]').forEach((el) => {
+      el.textContent = val(el.dataset.logoVal) + (el.dataset.logoVal === 'size' ? '%' : '');
+    });
+    $('logoEdit').querySelectorAll('[data-logo-needs]').forEach((el) => el.classList.toggle('disabled', !L[el.dataset.logoNeeds]));
+    const i = layers().indexOf(L);
+    $('logoUpBtn').disabled = i === layers().length - 1;
+    $('logoDownBtn').disabled = i === 0;
+  }
+  function bindLogos() {
+    $('logoAddBtn').addEventListener('click', () => $('logoFileInput').click());
+    $('logoFileInput').addEventListener('change', (e) => { addLogos(e.target.files); e.target.value = ''; });
+    $('logoEdit').querySelectorAll('[data-logo]').forEach((el) => {
+      const key = el.dataset.logo;
+      const set = (v) => {
+        const L = selLayer();
+        if (!L) return;
+        L[key] = v;
+        persist.logos(); syncLogoEdit(); requestRender();
+      };
+      if (el.classList.contains('side-switch')) el.addEventListener('click', () => { const L = selLayer(); if (L) set(!L[key]); });
+      else el.addEventListener('input', () => set(key === 'size' ? Number(el.value) / 100 : Number(el.value)));
+    });
+    $('logoUpBtn').addEventListener('click', () => moveLogo(1));
+    $('logoDownBtn').addEventListener('click', () => moveLogo(-1));
+    $('logoCenterBtn').addEventListener('click', () => {
+      const L = selLayer();
+      if (!L) return;
+      L.x = L.y = 0.5;
+      persist.logos(); requestRender();
+    });
+    $('logoDelBtn').addEventListener('click', () => { if (S.logoSel) removeLogo(S.logoSel); });
+    // Delete / Backspace removes the selected layer, Escape lets go of it
+    // (not while typing in a field)
+    document.addEventListener('keydown', (e) => {
+      if (!S.logoSel || (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeLogo(S.logoSel); }
+      else if (e.key === 'Escape') selectLogo(null);
+    });
+    window.addEventListener('resize', syncLogoMark);
   }
   function restoreWatermark() {
     return SINFORGE.idb.get('assets', 'watermark')
@@ -199,6 +362,7 @@
       btn.onclick = () => {
         if (S.blank === key) return;
         S.blank = key;
+        S.logoSel = null;
         SINFORGE.save('sinforge:blank', S.blank);
         syncBlankPick();
         buildTextFields();
@@ -429,7 +593,7 @@
       if (blank().names && slot.id === blank().names.last) box.appendChild(buildNameGen());
     });
     if (blank().licenses) box.appendChild(buildLicensePick());
-    $('logoSec').hidden = !blank().logo;
+    buildLogoPick();
   }
 
   // ---- license toggles (a blank with `licenses: true`): one icon per license,
@@ -916,14 +1080,6 @@
       S.tf = SINFORGE.newTransform();
       persist.tf(); syncControls(); requestRender();
     });
-    $('logoUploadBtn').addEventListener('click', () => $('logoFileInput').click());
-    $('logoFileInput').addEventListener('change', (e) => { loadLogo(e.target.files[0]); e.target.value = ''; });
-    $('logoClearBtn').addEventListener('click', () => {
-      S.logo = null;
-      SINFORGE.idb.del('assets', 'logo').catch(() => {});
-      resetLogoTf();
-    });
-    $('logoResetBtn').addEventListener('click', resetLogoTf);
     $('wmUploadBtn').addEventListener('click', () => $('wmFileInput').click());
     $('wmFileInput').addEventListener('change', (e) => { loadWatermark(e.target.files[0]); e.target.value = ''; });
     $('wmClearBtn').addEventListener('click', () => {
@@ -959,17 +1115,28 @@
   }));
   // the license tile under a point (as last rendered — gfx.licenseBoxes), or undefined
   const licenseAt = (p) => SINFORGE.gfx.licenseBoxes.find((b) => inBox(p, b));
+  // the logo layer under a point (as last rendered — gfx.logoBoxes): the
+  // selected one first, else the topmost; `selOnly` asks for the selected one
+  function logoAt(p, selOnly) {
+    const bs = SINFORGE.gfx.logoBoxes;
+    const sel = bs.find((b) => b.id === S.logoSel && inBox(p, b));
+    if (sel || selOnly) return sel;
+    for (let i = bs.length - 1; i >= 0; i--) if (inBox(p, bs[i])) return bs[i];
+    return undefined;
+  }
   // what a point on the canvas hits: 'photo', 'code' (the barcode as last
-  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'logo'
-  // (gfx.logoBox), 'date', 'license' or null
+  // rendered — gfx.codeBox), 'chip' (gfx.chipBox), 'dna' (gfx.dnaBox), 'date',
+  // 'license', 'logo' or null. Logos lie under everything, so they come last —
+  // except the selected one, which is grabbed first wherever it lies.
   function hitAt(p) {
+    if (logoAt(p, true)) return 'logo';
     if (inPhoto(p)) return 'photo';
     if (inBox(p, SINFORGE.gfx.codeBox)) return 'code';
     if (inBox(p, SINFORGE.gfx.chipBox)) return 'chip';
     if (inBox(p, SINFORGE.gfx.dnaBox)) return 'dna';
-    if (inBox(p, SINFORGE.gfx.logoBox)) return 'logo';
     if (licenseAt(p)) return 'license';
-    return dateAt(p) ? 'date' : null;
+    if (dateAt(p)) return 'date';
+    return logoAt(p) ? 'logo' : null;
   }
   // point in polygon (even-odd ray cast)
   function inPoly(p, pts) {
@@ -990,19 +1157,39 @@
   }
   // each click target's picker (the DNA strip has none: a click flips it
   // between the helix and the letters; nor a license tile: a click grants /
-  // revokes it; nor the logo slot: a click on an empty one opens the logo
-  // upload, a logo in it is dragged / wheel-zoomed like the photo)
+  // revokes it; nor a logo: a click selects it, a drag moves it, the wheel
+  // resizes it)
   const STAGE_POPS = { photo: 'framePop', code: 'codePop', chip: 'chipPop', date: 'datePop' };
-  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna', license: 'hint_lic', logo: 'hint_logoslot' };
-  const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox', logo: 'logoBox' };
+  const HINTS = { photo: 'hint_frame', code: 'hint_code', chip: 'hint_chip', date: 'hint_date', dna: 'hint_dna', license: 'hint_lic', logo: 'hint_logomove' };
+  const BOXES = { code: 'codeBox', chip: 'chipBox', dna: 'dnaBox' };
+  // an overlay SVG laid over the canvas as drawn, in the blank's native px
+  function placeOverlay(svg) {
+    const B = blank(), d = drawnRect(), s = $('stage').getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${B.w} ${B.h}`);
+    Object.assign(svg.style, {
+      left: d.left - s.left + 'px', top: d.top - s.top + 'px',
+      width: B.w * d.f + 'px', height: B.h * d.f + 'px',
+    });
+  }
+  const boxPoints = (c, pad) => [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
+  // the selected logo layer's outline, kept on while it's selected
+  function syncLogoMark() {
+    const svg = $('logoSelMark');
+    const b = S.logoSel && SINFORGE.gfx.logoBoxes.find((x) => x.id === S.logoSel);
+    svg.classList.toggle('show', !!b);
+    if (!b) return;
+    placeOverlay(svg);
+    svg.firstElementChild.setAttribute('points', boxPoints(b, 0).map((q) => q.join(',')).join(' '));
+  }
   // hover marker: the photo window's outline (or the barcode's / chip's /
   // the hovered date's / license tile's box) laid over the canvas; a license
   // tile also gets the edit pencil on its top-right corner and, when it's
   // customised, the reset button on its top-left
   function showHover(hit, p) {
     const svg = $('photoHover'), pen = $('licPenStage'), rst = $('licResetStage');
-    $('docCanvas').classList.toggle('over-photo', !!hit);
-    $('docCanvas').title = hit ? t(hit === 'logo' && S.logo ? 'hint_logomove' : HINTS[hit]) : '';
+    $('docCanvas').classList.toggle('over-photo', !!hit && hit !== 'logo');
+    $('docCanvas').classList.toggle('over-logo', hit === 'logo');
+    $('docCanvas').title = hit ? t(HINTS[hit]) : '';
     svg.classList.toggle('show', !!hit);
     pen.hidden = rst.hidden = hit !== 'license';
     if (!hit) return;
@@ -1016,15 +1203,10 @@
       pen.style.top = rst.style.top = top;
       rst.style.left = d.left - s.left + tile.x * d.f - pen.offsetWidth * 0.4 + 'px';
     }
-    svg.setAttribute('viewBox', `0 0 ${B.w} ${B.h}`);
-    Object.assign(svg.style, {
-      left: d.left - s.left + 'px', top: d.top - s.top + 'px',
-      width: B.w * d.f + 'px', height: B.h * d.f + 'px',
-    });
-    const c = hit === 'date' ? dateAt(p) : hit === 'license' ? licenseAt(p) : SINFORGE.gfx[BOXES[hit]];
-    const pad = hit === 'date' ? DATE_PAD : hit === 'license' ? 4 : 8;
-    const poly = hit === 'photo' ? B.photo.poly
-      : [[c.x - pad, c.y - pad], [c.x + c.w + pad, c.y - pad], [c.x + c.w + pad, c.y + c.h + pad], [c.x - pad, c.y + c.h + pad]];
+    placeOverlay(svg);
+    const c = hit === 'date' ? dateAt(p) : hit === 'license' ? licenseAt(p) : hit === 'logo' ? logoAt(p) : SINFORGE.gfx[BOXES[hit]];
+    const pad = hit === 'date' ? DATE_PAD : hit === 'license' ? 4 : hit === 'logo' ? 0 : 8;
+    const poly = hit === 'photo' ? B.photo.poly : boxPoints(c, pad);
     svg.firstElementChild.setAttribute('points', poly.map((p) => p.join(',')).join(' '));
   }
   // a picker pops up beside the click, kept inside the stage shell; one at a time
@@ -1046,12 +1228,16 @@
     let drag = null;
     cv.addEventListener('pointerdown', (e) => {
       const p = docPoint(e), hit = hitAt(p) || (onWatermark(p) && 'wm');
+      // a press on a logo selects it; anywhere else lets the selected one go
+      const lid = hit === 'logo' ? logoAt(p).id : null;
+      selectLogo(lid);
       if (!hit) return;
       // a press that barely moves is a click (its picker); more drags the photo
-      const [tx, ty] = hit === 'logo' ? [S.style.logoX, S.style.logoY]
+      const L = lid && selLayer();
+      const [tx, ty] = L ? [L.x, L.y]
         : hit === 'wm' ? [S.style.wmX, S.style.wmY] : [S.tf.x, S.tf.y];
       drag = {
-        hit, lic: hit === 'license' && licenseAt(p).key, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY,
+        hit, lic: hit === 'license' && licenseAt(p).key, lid, x: p.x, y: p.y, cx: e.clientX, cy: e.clientY,
         tx, ty, moved: false,
       };
       cv.setPointerCapture(e.pointerId);
@@ -1082,13 +1268,14 @@
         requestRender();
         return;
       }
-      const logo = drag.hit === 'logo';
-      if (logo ? !S.logo : drag.hit !== 'photo' || !S.photo) return;
+      const L = drag.lid && selLayer();
+      if (drag.hit === 'logo' ? !L : drag.hit !== 'photo' || !S.photo) return;
       if (!drag.moved) { drag.moved = true; cv.classList.add('dragging'); showHover(null); }
-      if (logo) {
-        const b = SINFORGE.gfx.logoBox;
-        S.style.logoX = clamp(drag.tx + (p.x - drag.x) / b.w, -2, 2);
-        S.style.logoY = clamp(drag.ty + (p.y - drag.y) / b.h, -2, 2);
+      if (L) {
+        // its centre stays on the card
+        const B = blank();
+        L.x = clamp(drag.tx + (p.x - drag.x) / B.w, 0, 1);
+        L.y = clamp(drag.ty + (p.y - drag.y) / B.h, 0, 1);
         requestRender();
         return;
       }
@@ -1102,8 +1289,8 @@
       const { hit, moved, lic } = drag;
       drag = null;
       cv.classList.remove('dragging');
-      if (moved) (hit === 'logo' || hit === 'wm' ? persist.style : persist.tf)();
-      else if (hit === 'wm') closeStagePops();
+      if (moved) (hit === 'logo' ? persist.logos : hit === 'wm' ? persist.style : persist.tf)();
+      else if (hit === 'wm' || hit === 'logo') closeStagePops();
       else if (hit === 'dna') {
         closeStagePops();
         S.style.dnaText = !S.style.dnaText;
@@ -1111,9 +1298,6 @@
       } else if (hit === 'license') {
         closeStagePops();
         toggleLicense(lic);
-      } else if (hit === 'logo') {
-        closeStagePops();
-        if (!S.logo) $('logoFileInput').click();
       } else setStagePop(hit, $(STAGE_POPS[hit]).hidden ? e : null);
     });
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
@@ -1153,16 +1337,17 @@
     });
     window.addEventListener('resize', closeStagePops);
     cv.addEventListener('wheel', (e) => {
-      const p = docPoint(e), lb = SINFORGE.gfx.logoBox;
-      if (S.logo && inBox(p, lb)) {
-        // zoom the logo about the point under the pointer
+      const p = docPoint(e);
+      if (hitAt(p) === 'logo') {
+        // resize the logo about the point under the pointer (and select it)
         e.preventDefault();
-        const st = S.style, r0 = SINFORGE.gfx.logoRect(lb, st, S.logo);
-        const z = clamp(st.logoZoom * Math.exp(-e.deltaY * 0.0015), 0.2, 5), q = z / st.logoZoom;
-        st.logoZoom = z;
-        st.logoX = clamp((p.x - (p.x - r0.x) * q - lb.x) / lb.w, -2, 2);
-        st.logoY = clamp((p.y - (p.y - r0.y) * q - lb.y) / lb.h, -2, 2);
-        persist.style(); requestRender();
+        selectLogo(logoAt(p).id);
+        const L = selLayer(), B = blank();
+        const z = clamp(L.size * Math.exp(-e.deltaY * 0.0015), 0.05, 1.5), q = z / L.size;
+        L.size = z;
+        L.x = clamp((p.x + (L.x * B.w - p.x) * q) / B.w, 0, 1);
+        L.y = clamp((p.y + (L.y * B.h - p.y) * q) / B.h, 0, 1);
+        persist.logos(); syncLogoEdit(); requestRender();
         return;
       }
       if (!inPhoto(p) || !S.photo) return;
@@ -1277,6 +1462,7 @@
     bindStage();
     bindPops();
     bindLicEditor();
+    bindLogos();
     bindDropPaste();
     SINFORGE.digital.init();
     document.addEventListener('sinforge:digital', syncControls);
@@ -1287,7 +1473,7 @@
       .catch(() => {}).then(requestRender);
     restorePhoto();
     restoreWatermark();
-    restoreLogo();
+    restoreLogos();
     restoreLicenseIcons();
   }
 

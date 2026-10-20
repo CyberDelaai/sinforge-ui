@@ -311,6 +311,15 @@
   .lic-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
   .lic-pick .blank-opt { width: 100%; height: auto; aspect-ratio: 1; padding: 5px; }
   .lic-cell { position: relative; }
+  /* logo layers: a thumbnail per layer, bottom first; checked = selected */
+  .logo-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
+  .logo-pick:empty { display: none; }
+  .logo-pick .blank-opt { width: 100%; height: auto; aspect-ratio: 1; padding: 4px; }
+  /* on a light plate, so dark logos (the usual) read on the dark panel */
+  .logo-pick img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; background: #d9d9e0; }
+  #logoEdit[hidden] { display: none; }
+  #logoEdit .btn-icon { height: 32px; }
+  #logoEdit .btn-icon:disabled { opacity: .35; cursor: default; }
   .blank-opt .li-img {
     display: block; width: 100%; height: 100%; background: currentColor;
     -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat;
@@ -516,6 +525,9 @@
     vector-effect: non-scaling-stroke; stroke-dasharray: 8 6; animation: hover-march 0.8s linear infinite;
   }
   @keyframes hover-march { to { stroke-dashoffset: -14; } }
+  /* the selected logo layer: a still dashed outline, no fill */
+  .doc-canvas.over-logo { cursor: grab; }
+  .photo-hover.logo-sel polygon { fill: none; stroke: var(--main); stroke-width: 1.5px; stroke-dasharray: 4 4; animation: none; }
   /* the stage's pickers pop up beside the click (app.js keeps them inside the
      stage shell); a narrow stage wraps their tiles */
   .frame-pop { position: absolute; z-index: 41; width: auto; max-width: calc(100% - 16px); }

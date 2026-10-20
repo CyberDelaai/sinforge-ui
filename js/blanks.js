@@ -520,7 +520,8 @@
     },
 
     // Horizontal operator ID (CR80 proportions, rounded corners): a dot-matrix
-    // strip over the photo, call sign + position on the right, a status tick
+    // strip over the photo, call sign + position on the right (a new logo
+  // lands beside them), a status tick
     // box, the code + a hatched bar over the card type, and an inverted
     // organisation band along the bottom carrying the fine print. Everything
     // keeps 38 clear of the inner contour (x 100..1500, y 100..910).
@@ -570,16 +571,20 @@
         // caption's cap top at the photo's top
         const CAP = 28, CAP_GAP = 18, ROW_GAP = 40;
         const capA = gfx.ascent(ctx, 'H', 400, CAP);
+        const csBase = TOP + capA + CAP_GAP + gfx.ascent(ctx, 'H', 700, 100);
+        const posCap = csBase + ROW_GAP + capA;
+        const posBase = posCap + CAP_GAP + gfx.ascent(ctx, 'H', 700, 76);
+        // a new logo lands in a square at the column's right end, 1.5× the
+        // height of the call sign + position (cap top of the first caption ..
+        // the position's baseline)
+        const spot = Math.round((posBase - TOP) * 1.5);
+        gfx.logoSpot = { x: R - spot, y: TOP, w: spot, h: spot };
         const cap = (t, y) => gfx.text(ctx, t, X, y, { size: CAP, color: ink, weight: 400, spacing: 0.12 });
-        let y = TOP + capA;
-        cap('CALL SIGN', y);
-        y += CAP_GAP + gfx.ascent(ctx, 'H', 700, 100);
-        gfx.text(ctx, doc.callsign, X, y, { size: 100, maxW: R - X, color: ink, spacing: 0.02 });
-        y += ROW_GAP + capA;
-        cap('POSITION', y);
-        y += CAP_GAP + gfx.ascent(ctx, 'H', 700, 76);
-        gfx.text(ctx, doc.position, X, y, { size: 76, maxW: R - X, color: ink, spacing: 0.02 });
-        const ruleY = y + 28;
+        cap('CALL SIGN', TOP + capA);
+        gfx.text(ctx, doc.callsign, X, csBase, { size: 100, maxW: R - X, color: ink, spacing: 0.02 });
+        cap('POSITION', posCap);
+        gfx.text(ctx, doc.position, X, posBase, { size: 76, maxW: R - X, color: ink, spacing: 0.02 });
+        const ruleY = posBase + 28;
         ctx.fillStyle = ink;
         ctx.fillRect(X, ruleY, R - X, 4);
 
@@ -645,7 +650,7 @@
     },
 
     // Vertical hanging access pass (rounded corners, a lanyard slot punched
-    // through the top): photo + the logo slot over the reference ID and
+    // through the top): photo + room for a logo over the reference ID and
     // expiry, a big access level, two small fields, a rule, the holder's
     // handle and name, and the code with the issuer at the bottom.
     // Everything keeps 38 clear of the inner contour (x 100..900, y ..1500).
@@ -668,8 +673,6 @@
         { id: 'org', label: 'f_org', max: 24 },
       ],
       names: { first: 'name1', last: 'name2' },
-      // the left panel adds the LOGO section (S.logo, drawn by gfx.logo)
-      logo: true,
       decor: ['slashes', 'barcode', 'edge'],
       mark: { ch: 'A', x: 500, y: 1150, size: 560 },
 
@@ -694,7 +697,7 @@
         const cap = (t, x, y, maxW) => gfx.text(ctx, t, x, y, { size: CAP, maxW, color: ink, weight: 400, spacing: 0.12 });
 
         // reference ID + expiry beside the photo, the expiry level with its
-        // bottom; the logo slot fills the room above them
+        // bottom; a new logo lands in the room above them
         const VAL = 40, ROW_GAP = 22;
         const expBase = PB, expCap = expBase - capH(VAL) - CAP_GAP;
         const refBase = expCap - capA - ROW_GAP, refCap = refBase - capH(VAL) - CAP_GAP;
@@ -702,7 +705,7 @@
         gfx.text(ctx, doc.number, X2, refBase, { size: VAL, maxW: R - X2, color: ink, spacing: 0.04 });
         cap('VALID THRU', X2, expCap, R - X2);
         gfx.date(ctx, doc.expires, X2, expBase, { size: VAL, maxW: R - X2, color: ink, spacing: 0.04 }, st);
-        gfx.logo(ctx, k, { x: X2, y: P.y, w: R - X2, h: refCap - capA - 40 - P.y }, st);
+        gfx.logoSpot = { x: X2, y: P.y, w: R - X2, h: refCap - capA - 40 - P.y };
 
         // the gap between sections: 64, or with no code (the issuer row alone at
         // the bottom) whatever lands that row on the bottom margin

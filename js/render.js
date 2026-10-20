@@ -266,45 +266,69 @@
     return c;
   };
 
-  // Where the logo lands in its slot `box`: contained in it at zoom 1, its
-  // top-left at the slot's, then scaled by st.logoZoom and moved by
-  // st.logoX / logoY (fractions of the slot) — the stage's drag / wheel set them.
-  gfx.logoRect = function logoRect(box, st, src) {
-    const f = Math.min(box.w / src.width, box.h / src.height) * st.logoZoom;
-    return { x: box.x + st.logoX * box.w, y: box.y + st.logoY * box.h, w: src.width * f, h: src.height * f };
+  // Where a logo layer (SINFORGE.newLogo) lands on blank B, native px: its
+  // image contained in a square of `size` × the card's shorter side, centred
+  // on (x, y) × the card.
+  gfx.logoRect = function logoRect(B, L, src) {
+    const side = L.size * Math.min(B.w, B.h);
+    const f = side / Math.max(src.width, src.height);
+    const w = src.width * f, h = src.height * f;
+    return { x: L.x * B.w - w / 2, y: L.y * B.h - h / 2, w, h };
   };
 
-  // The uploaded logo (S.logo) in `box` (placed by gfx.logoRect, clipped to the
-  // slot): in the ink colour (a gfx.mask cut at st.logoThr, filled) when st.logoTint, else in
-  // its own colours. The box is kept in gfx.logoBox (native px) — the stage's
-  // click / drag target, logo or not. The tinted logo is cached by source,
-  // colour and size.
-  let logoCache = { id: '', c: null };
-  gfx.logo = function logo(ctx, k, box, st) {
-    gfx.logoBox = box;
-    const src = S.logo;
-    if (!src) return;
-    const { x: lx, y: ly, w, h } = gfx.logoRect(box, st, src);
-    let img = src;
-    if (st.logoTint) {
-      const pw = Math.max(1, Math.round(w * k)), ph = Math.max(1, Math.round(h * k));
-      const id = [src.__id, st.ink, st.logoThr, pw, ph].join('|');
-      if (logoCache.id !== id) {
-        const c = gfx.mask(src, pw, ph, st.logoThr), x = c.getContext('2d');
-        x.globalCompositeOperation = 'source-in';
-        x.fillStyle = st.ink;
-        x.fillRect(0, 0, pw, ph);
-        logoCache = { id, c };
-      }
-      img = logoCache.c;
+  // The active blank's logo layers, bottom first, over the card + watermark and
+  // under every element: each in the ink colour (a gfx.mask cut at its
+  // threshold, filled) when tinted, else in its own colours, at its opacity;
+  // with st.photoOverLogos, kept out of the photo window. Their rects go to gfx.logoBoxes ({ id, x, y, w, h }, native px, bottom
+  // first) — the stage's click / drag targets. A tinted layer is cached by
+  // source, colour, threshold and size.
+  const logoCache = new Map();
+  function drawLogos(ctx, k, B, st) {
+    gfx.logoBoxes = [];
+    const layers = S.logos[S.blank] || [];
+    if (logoCache.size > layers.length) { // drop removed / other blanks' layers
+      logoCache.forEach((v, id) => { if (!layers.some((L) => L.id === id)) logoCache.delete(id); });
     }
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(box.x, box.y, box.w, box.h);
-    ctx.clip();
-    ctx.drawImage(img, lx, ly, w, h);
-    ctx.restore();
-  };
+    if (st.photoOverLogos && B.photo) {
+      // card minus the photo window (even-odd: the window becomes a hole)
+      ctx.beginPath();
+      [[0, 0], [B.w, 0], [B.w, B.h], [0, B.h]].forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.closePath();
+      B.photo.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.closePath();
+      ctx.clip('evenodd');
+    }
+    layers.forEach((L) => {
+      const src = S.logoImgs[L.id];
+      if (!src) return;
+      const r = gfx.logoRect(B, L, src);
+      gfx.logoBoxes.push({ id: L.id, x: r.x, y: r.y, w: r.w, h: r.h });
+      if (!L.alpha) return;
+      let img = src;
+      if (L.tint) {
+        const pw = Math.max(1, Math.round(r.w * k)), ph = Math.max(1, Math.round(r.h * k));
+        const sig = [src.__id, st.ink, L.thr, pw, ph].join('|');
+        let hit = logoCache.get(L.id);
+        if (!hit || hit.sig !== sig) {
+          const c = gfx.mask(src, pw, ph, L.thr), x = c.getContext('2d');
+          x.globalCompositeOperation = 'source-in';
+          x.fillStyle = st.ink;
+          x.fillRect(0, 0, pw, ph);
+          hit = { sig, c };
+          logoCache.set(L.id, hit);
+        }
+        img = hit.c;
+      }
+      ctx.save();
+      ctx.globalAlpha = L.alpha / 100;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, r.x, r.y, r.w, r.h);
+      ctx.restore();
+    });
+    ctx.restore(); // photo-window clip
+  }
+  gfx.logoBoxes = [];
 
   // A license icon (js/licenses.js) as a canvas at device pixels, in one colour;
   // `cut` shapes knock out of the icon only (never the card under it). A custom
@@ -670,10 +694,11 @@
     ctx.clip('evenodd');
 
     drawWatermark(ctx, B, st);
+    drawLogos(ctx, k, B, st);
     gfx.codeBox = null; // set again by gfx.code if the blank draws a barcode
     gfx.dnaBox = null;  // set by a blank that draws a DNA strip (its click target)
     gfx.chipBox = null; // set by gfx.chip
-    gfx.logoBox = null; // set by gfx.logo
+    gfx.logoSpot = null; // set by a blank with a natural place for a logo (a new one lands there)
     gfx.dateBoxes = []; // filled by gfx.date
     gfx.licenseBoxes = []; // filled by gfx.license
     B.draw(ctx, k, { gfx, S, st, doc: S.doc });
