@@ -316,7 +316,27 @@
       img.alt = '#' + (i + 1);
       btn.appendChild(img);
       btn.onclick = () => selectLogo(S.logoSel === L.id ? null : L.id);
-      box.appendChild(btn);
+      // the pencil: selects the layer and opens the ELEMENT window on it
+      const pen = document.createElement('button');
+      pen.type = 'button';
+      pen.className = 'lic-pen';
+      pen.dataset.layer = L.id;
+      pen.setAttribute('data-i18n-title', 'b_logoedit');
+      pen.title = t('b_logoedit');
+      pen.setAttribute('aria-label', t('b_logoedit'));
+      pen.setAttribute('aria-haspopup', 'dialog');
+      pen.setAttribute('aria-controls', 'logoPop');
+      pen.innerHTML = PEN_SVG;
+      pen.onclick = () => {
+        const open = !$('logoPop').hidden && S.logoSel === L.id;
+        selectLogo(L.id);
+        setPopOpen(open ? null : $('logoPop'));
+        syncLogoEdit();
+      };
+      const cell = document.createElement('div');
+      cell.className = 'logo-cell';
+      cell.append(btn, pen);
+      box.appendChild(cell);
     });
     if (S.logoSel && !selLayer()) S.logoSel = null;
     syncLogoEdit();
@@ -326,9 +346,12 @@
   function syncLogoEdit() {
     const L = selLayer();
     $('logoPick').querySelectorAll('.blank-opt').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.layer === S.logoSel)));
-    $('logoEdit').hidden = !L;
+    // the ELEMENT window follows the selection; nothing selected closes it
+    if (!L && !$('logoPop').hidden) setPopOpen(null);
+    $('logoPick').querySelectorAll('.lic-pen').forEach((p) => p.classList.toggle('active', !$('logoPop').hidden && p.dataset.layer === S.logoSel));
     syncLogoMark();
     if (!L) return;
+    $('logoPopNo').textContent = '#' + (layers().indexOf(L) + 1);
     const val = (key) => (key === 'size' ? Math.round(L.size * 100) : L[key]);
     $('logoEdit').querySelectorAll('[data-logo]').forEach((el) => {
       const v = val(el.dataset.logo);
@@ -1412,11 +1435,11 @@
   // (EIDOLON's COLOUR window); the top-right icon opens the DIGITAL window over
   // the column to the right. An icon names its window in aria-controls. ----
   function setPopOpen(pop) {
+    document.querySelectorAll('.adj-pop').forEach((p) => { p.hidden = p !== pop; });
     document.querySelectorAll('.stage-tool[aria-controls]').forEach((btn) => {
-      const on = btn.getAttribute('aria-controls') === (pop && pop.id);
-      $(btn.getAttribute('aria-controls')).hidden = !on;
-      btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+      btn.setAttribute('aria-expanded', btn.getAttribute('aria-controls') === (pop && pop.id) ? 'true' : 'false');
     });
+    $('logoPick').querySelectorAll('.lic-pen').forEach((p) => p.classList.toggle('active', pop === $('logoPop') && p.dataset.layer === S.logoSel));
   }
   function bindPops() {
     document.querySelectorAll('.stage-tool[aria-controls]').forEach((btn) => {
@@ -1424,13 +1447,16 @@
       btn.addEventListener('click', () => setPopOpen(pop.hidden ? pop : null));
       pop.querySelector('.adj-close').addEventListener('click', () => { setPopOpen(null); btn.focus(); });
     });
+    $('logoPop').querySelector('.adj-close').addEventListener('click', () => setPopOpen(null));
     const anyOpen = () => document.querySelector('.adj-pop:not([hidden])');
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && anyOpen()) setPopOpen(null); });
     // a press anywhere outside the open window closes it (its icon toggles it)
     document.addEventListener('pointerdown', (e) => {
       const pop = anyOpen();
       if (!pop || pop.contains(e.target)) return;
-      if (e.target.closest(`.stage-tool[aria-controls="${pop.id}"]`)) return;
+      if (e.target.closest(`[aria-controls="${pop.id}"]`)) return;
+      // the ELEMENT window stays while its layers are picked / dragged
+      if (pop.id === 'logoPop' && e.target.closest('#stage, #logoPick')) return;
       setPopOpen(null);
     });
   }

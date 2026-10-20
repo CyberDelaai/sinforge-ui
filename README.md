@@ -47,26 +47,29 @@ client-side; your images are never uploaded.
   division, the holder's handle and name, and the organisation with the code:
   a QR / 2D code sits square in the corner beside it, a barcode runs full
   width under it, and with the code off the photo grows instead).
-- **Logos** — any number of your own logos on any blank (LOGOS in the left
-  panel, ADD LOGO takes several images at once), each blank keeping its own.
-  They're a background layer: over the card and the watermark, under every
-  element. Drag one anywhere on the card, scroll over it to resize; a click
-  selects it (dashed outline), and the selected logo is grabbed first even
+- **Elements** — any number of your own images — decorative elements, logos,
+  emblems, stamps — on any blank (the ELEMENTS strip under the
+  preview: a thumbnail per element, the dashed + tile adds more — several images
+  at once), each blank keeping its own.
+  They're a background layer: over the card and the watermark, under everything
+  else. Drag one anywhere on the card, scroll over it to resize; a click
+  selects it (dashed outline), and the selected element is grabbed first even
   where it lies under the photo or text — click an empty part of the card or
-  press Escape to let it go. The selected one's settings: SCALE, AMOUNT
+  press Escape to let it go. The pencil on a thumbnail (on hover) opens that
+  element's ELEMENT window: SCALE, AMOUNT
   (opacity), PRINT IN INK (one colour — a THRESHOLD slider hardens it, mid
-  tones (a red logo) going solid and the background dropping out, up to a
+  tones (a red image) going solid and the background dropping out, up to a
   pure one-bit print — or its own colours), crop, bring forward / send
-  backward, centre, remove (or Delete). Every new logo opens the crop window
+  backward, centre, remove (or Delete). Every new element opens the crop window
   right away (several uploads: one after another; CANCEL keeps the whole
-  image, and the kept part fills the logo's spot); CROP reopens it over the
+  image, and the kept part fills the element's spot); CROP reopens it over the
   whole uploaded image: drag any rectangle (Shift on the corner keeps its
-  shape), FIT hugs the logo's content (its transparency, or what differs from
+  shape), FIT hugs the element's content (its transparency, or what differs from
   a solid background), MAX takes the whole image; the kept part stays where
-  it was on the card. The original is kept, so a logo can be recropped any
-  time. A new logo lands in the blank's natural spot
+  it was on the card. The original is kept, so an element can be recropped any
+  time. A new element lands in the blank's natural spot
   (beside the call sign on the operator ID, above the reference ID on the
-  access pass) or the card's centre. PHOTO OVER LOGOS keeps every logo out of
+  access pass) or the card's centre. PHOTO OVER ELEMENTS (in the same window) keeps every element out of
   the photo window, so none shows through a transparent photo (a 1-bit photo
   FX, a PNG cut-out).
 - **Text** — event badge: badge number, vertical role tag, title, two-line

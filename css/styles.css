@@ -217,8 +217,12 @@
     flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;
     align-self: flex-start; position: sticky; top: 16px; z-index: 2;
   }
+  /* the stage takes what the blank bar and the ELEMENTS panel leave of the
+     column's viewport height */
+  .workspace { height: max(720px, calc(100vh - 220px)); }
+  .workspace > .stage-shell { flex: 1 1 0; min-height: 300px; }
   .stage {
-    height: max(440px, calc(100vh - 286px)); position: relative;
+    height: 100%; position: relative;
     display: flex; align-items: center; justify-content: center;
     border: 2px dashed rgba(var(--main-rgb),0.35);
     background: repeating-linear-gradient(45deg, rgba(var(--main-rgb),0.03) 0 12px, transparent 12px 24px);
@@ -230,7 +234,9 @@
   @media (max-width: 1100px) {
     .layout { flex-wrap: wrap; }
     .config { width: 100%; }
-    .workspace { order: -1; width: 100%; position: static; }
+    .workspace { order: -1; width: 100%; position: static; height: auto; }
+    .workspace > .stage-shell { flex: none; }
+    .stage { height: max(440px, calc(100vh - 286px)); }
   }
 
   /* ---------- Toast (ported from eidolon-ui, augmented-ui clipped): status
@@ -311,12 +317,20 @@
   .lic-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
   .lic-pick .blank-opt { width: 100%; height: auto; aspect-ratio: 1; padding: 5px; }
   .lic-cell { position: relative; }
-  /* logo layers: a thumbnail per layer, bottom first; checked = selected */
-  .logo-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
-  .logo-pick:empty { display: none; }
-  .logo-pick .blank-opt { width: 100%; height: auto; aspect-ratio: 1; padding: 4px; }
+  /* ELEMENTS panel under the stage: label, the layers' thumbnails (bottom
+     first; checked = selected; a hover pencil opens the ELEMENT window) and
+     the dashed + tile that adds one, a note under them */
+  .elem-panel { width: 100%; align-self: stretch; padding: 12px 16px 14px; }
+  .elem-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .logo-pick { display: contents; }
+  .logo-cell { position: relative; }
+  .elem-row .blank-opt { width: 52px; height: 52px; padding: 4px; }
   /* on a light plate, so dark logos (the usual) read on the dark panel */
   .logo-pick img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; background: #d9d9e0; }
+  .logo-cell:hover .lic-pen, .logo-cell:focus-within .lic-pen { opacity: 1; }
+  .elem-add { display: grid; place-items: center; border-style: dashed; color: rgba(var(--main-rgb),0.6); }
+  .elem-add svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .elem-add:hover, .elem-add:focus-visible { color: var(--main); border-color: var(--main); outline: none; }
   #logoEdit[hidden] { display: none; }
   #logoEdit .btn-icon { height: 32px; }
   #logoEdit .btn-icon:disabled { opacity: .35; cursor: default; }
@@ -586,6 +600,8 @@
   .adj-pop[hidden] { display: none; }
   /* the DIGITAL window opens from the right edge: floats over the right column */
   .adj-pop-r { right: auto; left: calc(100% + 12px); }
+  /* the ELEMENT window sits low, beside the stage's bottom, next to the ELEMENTS panel */
+  .adj-pop#logoPop { top: auto; bottom: 0; }
 
   /* every pop-up window (stage pickers, EFFECTS / WATERMARK / PHOTO FX /
      DIGITAL, license editor, crop): a full-accent frame on a lifted panel with
@@ -616,4 +632,5 @@
     /* no column beside the stage: drop the window inside it, under the icons */
     .config.adj-pop { top: 134px; right: auto; left: 8px; width: min(360px, calc(100% - 16px)); }
     .config.adj-pop-r { top: 50px; left: auto; right: 8px; }
+    .config.adj-pop#logoPop { top: auto; bottom: 8px; }
   }
