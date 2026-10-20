@@ -355,6 +355,10 @@
   .lic-reset { right: auto; left: -5px; }
   .lic-cell:not(.custom) .lic-reset { display: none; }
   .lic-pen.lic-reset:hover, .lic-pen.lic-reset.stage-pen { color: var(--magenta); border-color: var(--magenta); }
+  /* trash: the same tab on an element thumbnail's top-left corner */
+  .lic-del { right: auto; left: -5px; }
+  .lic-pen.lic-del { color: var(--magenta); border-color: var(--magenta); }
+  .lic-pen.lic-del:hover { color: var(--main); border-color: rgba(var(--main-rgb),0.8); }
   /* license editor window: the icon (a grant / revoke toggle) beside its fields */
   .config.lic-box { width: min(500px, calc(100vw - 32px)); }
   .lic-edit { display: flex; gap: 16px; align-items: flex-start; }

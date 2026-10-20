@@ -333,9 +333,18 @@
         setPopOpen(open ? null : $('logoPop'));
         syncLogoEdit();
       };
+      // the trash: removes the layer straight from the strip
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'lic-pen lic-del';
+      del.setAttribute('data-i18n-title', 'b_logodel');
+      del.title = t('b_logodel');
+      del.setAttribute('aria-label', t('b_logodel'));
+      del.innerHTML = TRASH_SVG;
+      del.onclick = () => removeLogo(L.id);
       const cell = document.createElement('div');
       cell.className = 'logo-cell';
-      cell.append(btn, pen);
+      cell.append(btn, pen, del);
       box.appendChild(cell);
     });
     if (S.logoSel && !selLayer()) S.logoSel = null;
@@ -389,7 +398,6 @@
       L.x = L.y = 0.5;
       persist.logos(); requestRender();
     });
-    $('logoDelBtn').addEventListener('click', () => { if (S.logoSel) removeLogo(S.logoSel); });
     // Delete / Backspace removes the selected layer, Escape lets go of it
     // (not while typing in a field)
     document.addEventListener('keydown', (e) => {
@@ -678,6 +686,9 @@
   // reset: a counter-clockwise arrow (back to the built-in icon + caption)
   const RESET_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">'
     + '<path d="M5.5 9A7.5 7.5 0 1 1 4.5 14"/><path d="M4 4v5.5h5.5"/></svg>';
+  // trash: removes an element layer
+  const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M4 6h16M9 6V3.5h6V6M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';
   const isCustomLicense = (key) => !!(S.doc.licCaps[key] || S.licIcons[key]);
   function licenseIcon(key) {
     const mask = S.licIcons[key];

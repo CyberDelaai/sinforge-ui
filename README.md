@@ -55,12 +55,13 @@ client-side; your images are never uploaded.
   else. Drag one anywhere on the card, scroll over it to resize; a click
   selects it (dashed outline), and the selected element is grabbed first even
   where it lies under the photo or text — click an empty part of the card or
-  press Escape to let it go. The pencil on a thumbnail (on hover) opens that
-  element's ELEMENT window: SCALE, AMOUNT
+  press Escape to let it go. On hover a thumbnail shows a trash tab (removes
+  the element; so does Delete on the selected one) and a pencil, which opens
+  that element's ELEMENT window: SCALE, AMOUNT
   (opacity), PRINT IN INK (one colour — a THRESHOLD slider hardens it, mid
   tones (a red image) going solid and the background dropping out, up to a
   pure one-bit print — or its own colours), crop, bring forward / send
-  backward, centre, remove (or Delete). Every new element opens the crop window
+  backward, centre. Every new element opens the crop window
   right away (several uploads: one after another; CANCEL keeps the whole
   image, and the kept part fills the element's spot); CROP reopens it over the
   whole uploaded image: drag any rectangle (Shift on the corner keeps its
