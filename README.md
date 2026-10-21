@@ -143,6 +143,20 @@ client-side; your images are never uploaded.
 - **Export** — PNG at 1× (1200×1600) or 2× (2400×3200), transparent outside
   the card shape.
   Or copy it straight to the clipboard to paste into Discord, a VTT or an editor.
+- **Presets** — the PRESETS tab on the left edge slides out a panel of saved
+  documents: name and SAVE the current one (the blank, its text and licenses,
+  colours, decor, frame, barcode, chip, date format, watermark and effects —
+  optionally the output settings too — plus a copy of every image: the photo
+  with its framing, the elements with their positions, the watermark image and
+  custom license icons), then APPLY it (or click its thumbnail) any time; its
+  images replace the card's. A preset keeps its own copies, so changing or
+  removing an image on the card doesn't break it. The preset matching the
+  current document lights up; applying asks first if the current document
+  isn't saved anywhere. Five read-only EXAMPLE documents (one per blank, no
+  images — they leave yours alone) can be hidden; EXPORT / IMPORT moves your
+  presets, images included, between browsers as JSON. An IMAGE STORAGE bar
+  shows how much of the browser's storage the site uses and how much is left;
+  a preset that doesn't fit isn't saved.
 - Text, look, framing and the uploaded photo are remembered between visits.
 - UI in 8 languages: EN · RU · FR · DE · ES · IT · JP · CN.
 

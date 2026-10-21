@@ -58,14 +58,7 @@
     merge(S.tf, load('sinforge:tf'));
     merge(S.out, load('sinforge:out'));
     merge(S.names, load('sinforge:names'));
-    if (S.out.scale !== 1 && S.out.scale !== 2) S.out.scale = 1;
-    if (!SINFORGE.frames[S.style.frame]) S.style.frame = 'notch';
-    if (!Array.isArray(S.doc.licenses)) S.doc.licenses = SINFORGE.newDoc().licenses;
-    S.doc.licenses = S.doc.licenses.filter((key) => SINFORGE.licenses[key]);
-    if (!S.doc.licCaps || Array.isArray(S.doc.licCaps)) S.doc.licCaps = {};
-    Object.keys(S.doc.licCaps).forEach((key) => {
-      if (!SINFORGE.licenses[key] || typeof S.doc.licCaps[key] !== 'string') delete S.doc.licCaps[key];
-    });
+    sanitize();
     // logo layers: { blank: [layer…] }, each merged over a fresh one
     const logos = load('sinforge:logos');
     if (logos && typeof logos === 'object' && !Array.isArray(logos)) {
@@ -78,6 +71,21 @@
         });
       });
     }
+  }
+  // Values merge() can't vet by type alone (storage or an imported preset):
+  // unknown keys into the libraries, the license list / captions.
+  function sanitize() {
+    if (S.out.scale !== 1 && S.out.scale !== 2) S.out.scale = 1;
+    if (!SINFORGE.frames[S.style.frame]) S.style.frame = 'notch';
+    if (!SINFORGE.codes[S.style.code]) S.style.code = 'code128';
+    if (!SINFORGE.chips[S.style.chipType]) S.style.chipType = 'contact';
+    if (!SINFORGE.dateFormats[S.style.dateFmt]) S.style.dateFmt = 'iso';
+    if (!Array.isArray(S.doc.licenses)) S.doc.licenses = SINFORGE.newDoc().licenses;
+    S.doc.licenses = S.doc.licenses.filter((key) => SINFORGE.licenses[key]);
+    if (!S.doc.licCaps || Array.isArray(S.doc.licCaps)) S.doc.licCaps = {};
+    Object.keys(S.doc.licCaps).forEach((key) => {
+      if (!SINFORGE.licenses[key] || typeof S.doc.licCaps[key] !== 'string') delete S.doc.licCaps[key];
+    });
   }
 
   // ---- render scheduling: at most one preview render per frame ----
@@ -92,6 +100,7 @@
       SINFORGE.render(cv.getContext('2d'), 1);
       SINFORGE.digital.sync();
       syncLogoMark();
+      markActivePreset(); // every edit renders: the matching preset lights up
     });
   }
 
@@ -124,9 +133,12 @@
     S.photo = canvas;
     S.photoIsUser = isUser;
     requestRender();
+    refreshPresets();
   }
+  let doggo = null; // its source canvas, once loaded (also preset thumbnails without a photo)
   function useDoggo() {
-    return loadImage(C.DOGGO).then((img) => setPhoto(toSourceCanvas(img), false)).catch(() => {});
+    return (doggo ? Promise.resolve(doggo) : loadImage(C.DOGGO).then((img) => (doggo = toSourceCanvas(img))))
+      .then((c) => setPhoto(c, false)).catch(() => {});
   }
   function loadUserPhoto(file) {
     if (!file || !/^image\//.test(file.type)) { setStatus(t('st_badimg'), 'warn'); return; }
@@ -1497,6 +1509,541 @@
     };
   }
 
+  // ---- presets: named snapshots of a whole document — the blank, its text
+  // (S.doc) and look (S.style), optionally the output settings (S.out) — in a
+  // slide-out side panel (EIDOLON's PRESETS, the COMMLINK side-panel pattern).
+  // Stored as sinforge:presets = { NAME: { blank, doc, style, tf?, logos?, imgs?, out?, savedAt } }.
+  // A preset keeps copies of its images, so it outlives what's on the card:
+  //   logos  the blank's element layers (newLogo() fields), each under an id of
+  //          its own, its upload in IndexedDB as 'plogo:<id>'
+  //   imgs   { photo?, wm?, lic: { key: id } } — the user's photo (absent: the
+  //          doggo), the watermark image, custom license icons, as 'pimg:<id>';
+  //          tf = the photo's framing
+  // Applying one replaces the card's with fresh copies. A preset without them
+  // (the examples) leaves the card's images alone. ----
+  // overwrite: an arrow down into a tray (store the current document here)
+  const SAVE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M12 3v11M7.5 9.5L12 14l4.5-4.5"/><path d="M4 14v6h16v-6"/></svg>';
+  const tv = (k, vars) => {
+    let s = t(k);
+    Object.keys(vars || {}).forEach((v) => { s = s.split('{' + v + '}').join(vars[v]); });
+    return s;
+  };
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  function loadPresets() {
+    const all = load('sinforge:presets');
+    return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+  }
+  const savePresets = (p) => SINFORGE.save('sinforge:presets', JSON.stringify(p));
+  // a preset's element layers, merged over fresh ones (null: it has none to apply)
+  function presetLayers(p) {
+    if (!Array.isArray(p.logos)) return null;
+    return p.logos.filter((L) => L && typeof L.id === 'string').map((L) => {
+      const n = SINFORGE.newLogo(L.id);
+      merge(n, L);
+      return n;
+    });
+  }
+  // their placement / settings, image aside (copies never share an id)
+  const LAYOUT = Object.keys(SINFORGE.newLogo('')).filter((k) => k !== 'id');
+  const layoutKey = (ls) => JSON.stringify((ls || []).map((L) => LAYOUT.map((k) => L[k])));
+  // their images (cropped, as drawn) by preset layer id; null = missing
+  const pImgs = {};
+  function loadPresetImages(ls) {
+    return Promise.all(ls.filter((L) => !(L.id in pImgs)).map((L) => SINFORGE.idb.get('assets', 'plogo:' + L.id)
+      .then((blob) => (blob ? blobToCanvas(blob) : null))
+      .then((c) => {
+        if (c && !isWhole(L)) {
+          c = SINFORGE.crop.apply(c, { x: L.cx, y: L.cy, w: L.cw, h: L.ch });
+          c.__id = ++photoSeq; // logo cache key in render.js
+        }
+        pImgs[L.id] = c;
+      }, () => { pImgs[L.id] = null; })));
+  }
+  // a preset's other images (null: it has none to apply)
+  function presetImgs(p) {
+    const im = p.imgs;
+    if (!im || typeof im !== 'object' || Array.isArray(im)) return null;
+    const id = (v) => (typeof v === 'string' && v ? v : null), lic = {};
+    if (im.lic && typeof im.lic === 'object') {
+      Object.keys(im.lic).forEach((k) => { if (SINFORGE.licenses[k] && id(im.lic[k])) lic[k] = im.lic[k]; });
+    }
+    return { photo: id(im.photo), wm: id(im.wm), lic };
+  }
+  const imgIds = (im) => (im ? [im.photo, im.wm, ...Object.values(im.lic)].filter(Boolean) : []);
+  function loadImgAssets(ids) {
+    return Promise.all(ids.filter((id) => !(id in pImgs)).map((id) => SINFORGE.idb.get('assets', 'pimg:' + id)
+      .then((blob) => (blob ? blobToCanvas(blob) : null))
+      .then((c) => { pImgs[id] = c; }, () => { pImgs[id] = null; })));
+  }
+  function presetTf(p) {
+    const tf = SINFORGE.newTransform();
+    merge(tf, p.tf);
+    return tf;
+  }
+  const tfKey = (tf) => JSON.stringify(Object.keys(S.tf).map((k) => tf[k]));
+  function dropPresetImages(p) {
+    if (!p) return;
+    (Array.isArray(p.logos) ? p.logos : []).forEach((L) => {
+      if (!L || typeof L.id !== 'string') return;
+      SINFORGE.idb.del('assets', 'plogo:' + L.id).catch(() => {});
+      delete pImgs[L.id];
+    });
+    imgIds(presetImgs(p)).forEach((id) => {
+      SINFORGE.idb.del('assets', 'pimg:' + id).catch(() => {});
+      delete pImgs[id];
+    });
+  }
+  const validPreset = (p) => !!(p && SINFORGE.blanks[p.blank]
+    && p.doc && typeof p.doc === 'object' && p.style && typeof p.style === 'object');
+  // Built-in EXAMPLE documents, one per blank: overrides on the pristine
+  // defaults, never stored, so they're read-only, stay current and never reach
+  // an export.
+  const EXAMPLES = (() => {
+    const ex = (blank, doc, style) => ({
+      blank, doc: Object.assign(SINFORGE.newDoc(), doc), style: Object.assign(SINFORGE.newStyle(), style), example: true,
+    });
+    return {
+      'NEON GALA': ex('event-badge',
+        { number: 'VIP-2077-0042', role: 'VIP', title: 'MS', name1: 'NOVA', name2: 'KAGE', footer: 'NEON GALA // BACKSTAGE' },
+        { ...SINFORGE.schemes.night, frame: 'brackets', code: 'matrix', glow: true, glowAmt: 45 }),
+      'SECTOR 7 SIN': ex('citizen-id', {},
+        { ...SINFORGE.schemes.chrome, frame: 'octagon', chipType: 'emv', dateFmt: 'dmon', grain: true, grainAmt: 20 }),
+      'BOUNTY HUNTER': ex('license',
+        { name1: 'JAX', name2: 'MORROW', licenseNo: 'BH-4410-9921', licenses: ['firearms', 'blades', 'bounty', 'driver'] },
+        { ...SINFORGE.schemes.toxic, frame: 'shield', code: 'stacked', photoFx: 'mono', photoLevel: 45 }),
+      'BLACK OPS': ex('operator-id',
+        { callsign: 'RAVEN-3', position: 'INFILTRATOR', opStatus: 'DEEP COVER // TIER 5 CLEARANCE', number: 'NS-0013-6650',
+          cardType: 'FIELD AGENT ID', org: 'NULL SECTOR', division: 'BLACK OPERATIONS' },
+        { ...SINFORGE.schemes.blood, frame: 'scope', code: 'postal', photoFx: 'halftone', photoDot: 8, scan: true, scanAmt: 30 }),
+      'ARENA PASS': ex('access-pass',
+        { access: 'BACKSTAGE', zone: 'ARENA // LEVEL 3', division: 'NIGHT SHIFT CREW', handle: '@NEONKAGE',
+          name1: 'NOVA', name2: 'KAGE', org: 'SUNSET ARENA' },
+        { ...SINFORGE.schemes.sunset, frame: 'slant', code: 'dots', wm: 'text', wmText: 'ALL ACCESS', wmAmt: 12 }),
+    };
+  })();
+  const showExamples = () => { try { return localStorage.getItem('sinforge:showExamples') !== '0'; } catch (e) { return true; } };
+  // user presets first (they win a name clash), then the examples
+  function allPresets() {
+    const own = loadPresets(), out = {};
+    Object.keys(own).forEach((n) => { if (validPreset(own[n])) out[n] = own[n]; });
+    if (showExamples()) Object.keys(EXAMPLES).forEach((n) => { if (!out[n]) out[n] = EXAMPLES[n]; });
+    return out;
+  }
+  // a preset as the state it makes: merged over the defaults like restore()
+  function presetState(p) {
+    const doc = SINFORGE.newDoc(), style = SINFORGE.newStyle();
+    merge(doc, p.doc);
+    merge(style, p.style);
+    return { blank: p.blank, doc, style };
+  }
+  // identity of a document — the preset matching the current one lights up
+  const docKey = (blank, doc, style) => JSON.stringify([blank, Object.keys(S.doc).map((k) => doc[k]), Object.keys(S.style).map((k) => style[k])]);
+  const presetKey = (p) => { const s = presetState(p); return docKey(s.blank, s.doc, s.style); };
+  // the current document is this preset: same blank, text and look, the same
+  // elements (none when the preset has none to apply) and, when it carries
+  // images, the same photo framing (the pictures themselves aren't compared)
+  function matchesNow(key, lkey, tkey) {
+    if (key !== docKey(S.blank, S.doc, S.style)) return false;
+    if (tkey != null && tkey !== tfKey(S.tf)) return false;
+    const ls = S.logos[S.blank] || [];
+    return lkey == null ? !ls.length : lkey === layoutKey(ls);
+  }
+  const presetMatches = (p) => {
+    const ls = presetLayers(p);
+    return matchesNow(presetKey(p), ls && layoutKey(ls), presetImgs(p) && tfKey(presetTf(p)));
+  };
+  function presetStamp(ms) {
+    const d = new Date(ms || 0);
+    if (isNaN(d.getTime())) return '';
+    const p2 = (n) => String(n).padStart(2, '0');
+    return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${p2(d.getFullYear() % 100)} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  }
+  // the card as the preset makes it (its own images, or today's when it has
+  // none), fitted into the thumbnail box; the renderer's stage targets are
+  // re-recorded by the next preview render
+  const THUMB = { w: 76, h: 56 };
+  function renderPresetThumb(canvas, p) {
+    const s = presetState(p), B = SINFORGE.blanks[s.blank];
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const f = Math.min(THUMB.w / B.w, THUMB.h / B.h);
+    canvas.width = Math.round(B.w * f * dpr);
+    canvas.height = Math.round(B.h * f * dpr);
+    canvas.style.width = Math.round(B.w * f) + 'px';
+    canvas.style.height = Math.round(B.h * f) + 'px';
+    const keep = { blank: S.blank, doc: S.doc, style: S.style, logos: S.logos, logoImgs: S.logoImgs,
+      photo: S.photo, tf: S.tf, wmImage: S.wmImage, licIcons: S.licIcons };
+    const ls = presetLayers(p), im = presetImgs(p);
+    Object.assign(S, s);
+    if (ls) { S.logos = { [s.blank]: ls }; S.logoImgs = pImgs; }
+    if (im) {
+      S.photo = (im.photo ? pImgs[im.photo] : doggo) || null;
+      S.tf = presetTf(p);
+      S.wmImage = (im.wm && pImgs[im.wm]) || null;
+      S.licIcons = {};
+      Object.keys(im.lic).forEach((k) => { if (pImgs[im.lic[k]]) S.licIcons[k] = pImgs[im.lic[k]]; });
+    }
+    try { SINFORGE.render(canvas.getContext('2d'), f * dpr); } finally { Object.assign(S, keep); }
+  }
+  function buildPresetList() {
+    const box = $('presetList'), presets = allPresets();
+    box.textContent = '';
+    const names = Object.keys(presets).sort((a, b) => (!!presets[a].example - !!presets[b].example)
+      || (presets[b].savedAt || 0) - (presets[a].savedAt || 0));
+    if (!names.length) {
+      const e = document.createElement('div');
+      e.className = 'preset-empty';
+      e.textContent = t('p_empty');
+      box.appendChild(e);
+      return;
+    }
+    names.forEach((name) => {
+      const p = presets[name];
+      const item = document.createElement('div');
+      item.className = 'preset-item' + (p.example ? ' example' : '');
+      item.dataset.key = presetKey(p);
+      const ls = presetLayers(p), im = presetImgs(p);
+      if (ls) item.dataset.lkey = layoutKey(ls);
+      if (im) item.dataset.tkey = tfKey(presetTf(p));
+      const tb = document.createElement('div');
+      tb.className = 'preset-thumb';
+      tb.title = t('b_apply');
+      const c = document.createElement('canvas');
+      renderPresetThumb(c, p);
+      // its images load from IndexedDB: draw it again once they're in
+      const ids = imgIds(im);
+      if ((ls && ls.some((L) => !(L.id in pImgs))) || ids.some((id) => !(id in pImgs))) {
+        Promise.all([loadPresetImages(ls || []), loadImgAssets(ids)]).then(() => { renderPresetThumb(c, p); requestRender(); });
+      }
+      tb.appendChild(c);
+      tb.addEventListener('click', () => applyPreset(name));
+      const body = document.createElement('div');
+      body.className = 'preset-body';
+      const nm = document.createElement('div');
+      nm.className = 'preset-name';
+      nm.textContent = name;
+      const meta = document.createElement('div');
+      meta.className = 'preset-meta';
+      meta.textContent = '// ' + [p.example ? t('p_example') : presetStamp(p.savedAt),
+        t('bl_' + p.blank.replace(/-/g, '_')), ls && ls.length ? '+' + ls.length + ' ' + t('l_logo') : '',
+        p.out ? '+OUT' : ''].filter(Boolean).join(' · ');
+      const acts = document.createElement('div');
+      acts.className = 'preset-actions';
+      const mk = (cls, attr, html, title) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ' + cls;
+        b.setAttribute(attr, '');
+        b.setAttribute('data-augmented-ui', 'tl-clip br-clip border');
+        b.innerHTML = html;
+        if (title) { b.title = title; b.setAttribute('aria-label', title); }
+        acts.appendChild(b);
+        return b;
+      };
+      mk('btn-alt', 'data-apply', t('b_apply')).addEventListener('click', () => applyPreset(name));
+      if (!p.example) { // the examples are read-only
+        mk('btn-icon', 'data-override', SAVE_SVG, t('t_poverride')).addEventListener('click', () => {
+          if (confirm(tv('c_poverwrite', { n: name }))) storePreset(name);
+        });
+        mk('btn-icon btn-warn', 'data-del', TRASH_SVG, t('t_pdelete')).addEventListener('click', () => {
+          if (!confirm(tv('c_pdelete', { n: name }))) return;
+          const all = loadPresets();
+          dropPresetImages(all[name]);
+          delete all[name];
+          savePresets(all);
+          buildPresetList();
+          setStatus(tv('s_pdeleted', { n: name }));
+        });
+      }
+      body.append(nm, meta, acts);
+      item.append(tb, body);
+      box.appendChild(item);
+    });
+    markActivePreset();
+    requestRender();
+    updateStorage();
+  }
+  // how much of the browser's storage this site holds (the images live in
+  // IndexedDB) against what the browser allows it; hidden where unknown
+  const fmtBytes = (n) => {
+    const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (i ? n.toFixed(n < 10 ? 1 : 0) : n) + ' ' + u[i];
+  };
+  function updateStorage() {
+    const el = $('storageMeter');
+    if (!navigator.storage || !navigator.storage.estimate) { el.hidden = true; return; }
+    navigator.storage.estimate().then(({ usage = 0, quota = 0 }) => {
+      if (!quota) { el.hidden = true; return; }
+      const f = Math.min(1, usage / quota);
+      el.hidden = false;
+      el.classList.toggle('warn', f > 0.8);
+      $('storageBar').style.width = Math.max(f * 100, usage ? 0.5 : 0).toFixed(2) + '%';
+      $('storageVal').textContent = tv('l_storefree', { u: fmtBytes(usage), f: fmtBytes(Math.max(0, quota - usage)) });
+      el.title = tv('t_storage', { q: fmtBytes(quota) });
+    }).catch(() => { el.hidden = true; });
+  }
+  const panelOpen = () => $('sidePresets').classList.contains('open');
+  // the thumbnails show today's photo and the webfont: redraw them once either loads
+  const refreshPresets = () => { if (panelOpen()) buildPresetList(); };
+  // the current document matches a preset: highlight it (cheap, no thumbnails)
+  function markActivePreset() {
+    if (!panelOpen()) return;
+    $('presetList').querySelectorAll('.preset-item').forEach((el) => el.classList.toggle('active', matchesNow(el.dataset.key, el.dataset.lkey, el.dataset.tkey)));
+  }
+  // the document now (sync), then a copy of each image under a fresh id; the
+  // preset it replaces lets go of its own copies. Out of room (IndexedDB
+  // refuses a copy): nothing is saved and the copies made go again.
+  function storePreset(name) {
+    const p = { blank: S.blank, doc: clone(S.doc), style: clone(S.style), tf: clone(S.tf), savedAt: Date.now() };
+    if ($('presetWithOut').checked) p.out = clone(S.out);
+    // a refused copy marks the save failed, but every copy settles first, so
+    // the clean-up sees them all
+    const written = [];
+    let failed = false;
+    const copy = (from, prefix, img) => SINFORGE.idb.get('assets', from).then((blob) => {
+      if (!blob) return null;
+      const id = newLogoId();
+      return SINFORGE.idb.put('assets', prefix + id, blob).then(() => {
+        written.push(prefix + id);
+        pImgs[id] = img;
+        return id;
+      });
+    }).catch(() => { failed = true; return null; });
+    const layers = (S.logos[S.blank] || []).filter((L) => S.logoImgs[L.id]).map((L) => ({ L: clone(L), img: S.logoImgs[L.id] }));
+    const lic = Object.keys(S.licIcons).filter((k) => SINFORGE.licenses[k]);
+    return Promise.all([
+      Promise.all(layers.map(({ L, img }) => copy('logo:' + L.id, 'plogo:', img).then((id) => id && Object.assign(L, { id })))),
+      S.photoIsUser ? copy('photo', 'pimg:', S.photo) : null,
+      S.wmImage ? copy('watermark', 'pimg:', S.wmImage) : null,
+      Promise.all(lic.map((k) => copy('lic:' + k, 'pimg:', S.licIcons[k]).then((id) => [k, id]))),
+    ]).then(([ls, photo, wm, lics]) => {
+      if (failed) {
+        written.forEach((k) => SINFORGE.idb.del('assets', k).catch(() => {}));
+        updateStorage();
+        setStatus(t('s_pnospace'), 'warn');
+        return;
+      }
+      p.logos = ls.filter(Boolean);
+      p.imgs = { lic: {} };
+      if (photo) p.imgs.photo = photo;
+      if (wm) p.imgs.wm = wm;
+      lics.forEach(([k, id]) => { if (id) p.imgs.lic[k] = id; });
+      const all = loadPresets();
+      dropPresetImages(all[name]);
+      all[name] = p;
+      savePresets(all);
+      buildPresetList();
+      setStatus(tv('s_psaved', { n: name }), 'ok');
+    });
+  }
+  function savePresetFromInput() {
+    const input = $('presetName'), name = input.value.trim().toUpperCase();
+    if (!name) { setStatus(t('s_pnamereq'), 'warn'); input.focus(); return; }
+    if (loadPresets()[name] && !confirm(tv('c_poverwrite', { n: name }))) return;
+    storePreset(name);
+    input.value = '';
+  }
+  // Applying replaces the whole document: ask first when the current one isn't
+  // kept in any preset (its text / elements would be lost).
+  function applyPreset(name) {
+    const all = allPresets(), p = all[name];
+    if (!p) return;
+    if (!Object.keys(all).some((n) => presetMatches(all[n])) && !confirm(tv('c_papply', { n: name }))) return;
+    const s = presetState(p), ls = presetLayers(p);
+    if (ls) {
+      // the blank's elements make way for copies of the preset's (new ids:
+      // the card's layers and the preset's never share an upload)
+      (S.logos[s.blank] || []).map((L) => L.id).forEach(removeLogo);
+      S.logos[s.blank] = ls.map((pl) => {
+        const L = Object.assign(clone(pl), { id: newLogoId() });
+        SINFORGE.idb.get('assets', 'plogo:' + pl.id).then((blob) => {
+          if (!blob) { removeLogo(L.id); return; }
+          return SINFORGE.idb.put('assets', 'logo:' + L.id, blob)
+            .then(() => blobToCanvas(blob))
+            .then((c) => { setLogoImage(L, c); buildLogoPick(); requestRender(); });
+        }).catch(() => removeLogo(L.id));
+        return L;
+      });
+      persist.logos();
+    }
+    const im = presetImgs(p);
+    if (im) applyImages(p, im);
+    S.blank = s.blank;
+    S.doc = s.doc;
+    S.style = s.style;
+    if (p.out && typeof p.out === 'object') merge(S.out, p.out);
+    sanitize();
+    S.logoSel = null;
+    SINFORGE.save('sinforge:blank', S.blank);
+    persist.doc(); persist.style(); persist.out();
+    syncBlankPick();
+    buildTextFields();
+    SINFORGE.digital.set(S.out.digital); // its switch + backdrop swatches
+    syncControls();
+    requestRender();
+    setStatus(tv('s_papplied', { n: name }), 'ok');
+  }
+  // the preset's photo (+ framing), watermark image and license icons replace
+  // the card's: each copied back to its own IndexedDB key. A newer apply wins
+  // over the copies still under way.
+  let applySeq = 0;
+  function applyImages(p, im) {
+    const seq = ++applySeq, live = () => seq === applySeq;
+    const copyBack = (id, key, use) => SINFORGE.idb.get('assets', 'pimg:' + id).then((blob) => {
+      if (!blob || !live()) return;
+      return SINFORGE.idb.put('assets', key, blob).then(() => blobToCanvas(blob)).then((c) => { if (live()) use(c); });
+    }).catch(() => {});
+    S.tf = presetTf(p);
+    persist.tf();
+    if (im.photo) copyBack(im.photo, 'photo', (c) => setPhoto(c, true));
+    else {
+      SINFORGE.idb.del('assets', 'photo').catch(() => {});
+      if (S.photoIsUser) useDoggo();
+    }
+    if (im.wm) copyBack(im.wm, 'watermark', (c) => { S.wmImage = c; requestRender(); });
+    else {
+      S.wmImage = null;
+      SINFORGE.idb.del('assets', 'watermark').catch(() => {});
+    }
+    Object.keys(S.licIcons).forEach((k) => {
+      if (im.lic[k]) return;
+      delete S.licIcons[k];
+      SINFORGE.idb.del('assets', 'lic:' + k).catch(() => {});
+    });
+    Object.keys(im.lic).forEach((k) => copyBack(im.lic[k], 'lic:' + k, (c) => {
+      c.__id = ++photoSeq; // icon cache key in render.js
+      S.licIcons[k] = c;
+      refreshLicense(k);
+    }));
+  }
+  function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  // element images travel inside the JSON as data URLs (layer.src)
+  const blobToDataUrl = (blob) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(blob);
+  });
+  function dataUrlToBlob(url) {
+    const m = /^data:(image\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(String(url));
+    if (!m) return null;
+    const bin = atob(m[2].replace(/\s+/g, '')), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: m[1] });
+  }
+  function exportPresets() {
+    const all = loadPresets();
+    const url = (key) => SINFORGE.idb.get('assets', key).then((blob) => (blob ? blobToDataUrl(blob) : null)).catch(() => null);
+    Promise.all(Object.keys(all).map((name) => {
+      const p = all[name], im = presetImgs(p), q = Object.assign({}, p);
+      all[name] = q;
+      return Promise.all([
+        Array.isArray(p.logos) && Promise.all(p.logos.map((L) => url('plogo:' + L.id).then((src) => src && Object.assign({}, L, { src }))))
+          .then((ls) => { q.logos = ls.filter(Boolean); }),
+        im && Promise.all([im.photo && url('pimg:' + im.photo), im.wm && url('pimg:' + im.wm),
+          Promise.all(Object.keys(im.lic).map((k) => url('pimg:' + im.lic[k]).then((src) => [k, src])))])
+          .then(([photo, wm, lics]) => {
+            q.imgs = { lic: {} };
+            if (photo) q.imgs.photo = photo;
+            if (wm) q.imgs.wm = wm;
+            lics.forEach(([k, src]) => { if (src) q.imgs.lic[k] = src; });
+          }),
+      ]);
+    })).then(() => {
+      const body = JSON.stringify({ app: 'sinforge', kind: 'presets', version: 1, presets: all }, null, 2);
+      download(new Blob([body], { type: 'application/json' }), 'sinforge_presets.json');
+    }).catch(() => setStatus(t('st_fail'), 'warn'));
+  }
+  function importPresets(file) {
+    file.text().then((txt) => {
+      const data = JSON.parse(txt), src = data && (data.presets || data);
+      const found = [];
+      Object.keys(src || {}).forEach((name) => {
+        const p = src[name];
+        if (!validPreset(p)) return;
+        const key = String(name).trim().toUpperCase().slice(0, 24);
+        if (!key) return;
+        const q = { blank: p.blank, doc: p.doc, style: p.style, savedAt: Number(p.savedAt) || Date.now() };
+        if (p.out && typeof p.out === 'object') q.out = p.out;
+        if (p.tf && typeof p.tf === 'object') q.tf = p.tf;
+        // an image (data URL) -> IndexedDB under a fresh id
+        const put = (src) => {
+          const blob = dataUrlToBlob(src), id = newLogoId();
+          return blob ? SINFORGE.idb.put('assets', 'pimg:' + id, blob).then(() => id) : Promise.resolve(null);
+        };
+        const im = p.imgs && typeof p.imgs === 'object' ? p.imgs : null, lic = im && im.lic && typeof im.lic === 'object' ? im.lic : {};
+        const imgsDone = im && Promise.all([put(im.photo), put(im.wm),
+          Promise.all(Object.keys(lic).filter((k) => SINFORGE.licenses[k]).map((k) => put(lic[k]).then((id) => [k, id])))])
+          .then(([photo, wm, lics]) => {
+            q.imgs = { lic: {} };
+            if (photo) q.imgs.photo = photo;
+            if (wm) q.imgs.wm = wm;
+            lics.forEach(([k, id]) => { if (id) q.imgs.lic[k] = id; });
+          });
+        // each element's image goes to IndexedDB under a fresh id
+        const ls = Array.isArray(p.logos) ? p.logos.filter((L) => L && typeof L === 'object') : null;
+        found.push(Promise.all((ls || []).map((L) => {
+          const blob = dataUrlToBlob(L.src);
+          if (!blob) return null;
+          const n = SINFORGE.newLogo(newLogoId());
+          merge(n, Object.assign({}, L, { id: n.id }));
+          return SINFORGE.idb.put('assets', 'plogo:' + n.id, blob).then(() => n, () => null);
+        })).then((layers) => {
+          if (ls) q.logos = layers.filter(Boolean);
+          return imgsDone;
+        }).then(() => [key, q]));
+      });
+      if (!found.length) throw new Error('empty');
+      return Promise.all(found).then((pairs) => {
+        const all = loadPresets();
+        pairs.forEach(([key, q]) => { dropPresetImages(all[key]); all[key] = q; });
+        savePresets(all);
+        buildPresetList();
+        setStatus(tv('s_pimported', { n: pairs.length }), 'ok');
+      });
+    }).catch(() => setStatus(t('s_pimportfail'), 'warn'));
+  }
+  // the side panel: its edge tab slides it in / out; Esc or a press outside closes it
+  function setPresetsOpen(on) {
+    const p = $('sidePresets'), tab = $('presetsToggle');
+    p.classList.toggle('open', on);
+    tab.setAttribute('aria-expanded', on ? 'true' : 'false');
+    $('presetsArrow').textContent = on ? '<' : '>';
+    SINFORGE.save('sinforge:panel', on ? 'presets' : '');
+    if (on) buildPresetList();
+  }
+  function bindPresets() {
+    $('presetsToggle').addEventListener('click', () => setPresetsOpen(!panelOpen()));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panelOpen() && $('cropModal').hidden && $('licModal').hidden) setPresetsOpen(false);
+    });
+    document.addEventListener('pointerdown', (e) => {
+      if (panelOpen() && !$('sidePresets').contains(e.target)) setPresetsOpen(false);
+    });
+    $('presetSave').addEventListener('click', savePresetFromInput);
+    $('presetName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); savePresetFromInput(); } });
+    $('presetWithOut').checked = (() => { try { return localStorage.getItem('sinforge:presetOut') === '1'; } catch (e) { return false; } })();
+    $('presetWithOut').addEventListener('change', (e) => SINFORGE.save('sinforge:presetOut', e.target.checked ? '1' : '0'));
+    $('presetShowEx').checked = showExamples();
+    $('presetShowEx').addEventListener('change', (e) => { SINFORGE.save('sinforge:showExamples', e.target.checked ? '1' : '0'); buildPresetList(); });
+    $('presetExport').addEventListener('click', exportPresets);
+    $('presetImport').addEventListener('click', () => $('presetFile').click());
+    $('presetFile').addEventListener('change', (e) => { if (e.target.files[0]) importPresets(e.target.files[0]); e.target.value = ''; });
+    document.addEventListener('sinforge:lang', refreshPresets); // the blank names in the meta lines
+    const was = (() => { try { return localStorage.getItem('sinforge:panel'); } catch (e) { return ''; } })();
+    setPresetsOpen(was === 'presets');
+  }
+
   // ---- export ----
   function fileName() {
     const slug = [S.doc.name1, S.doc.name2].join('-').toLowerCase()
@@ -1552,12 +2099,13 @@
     bindLogos();
     bindDropPaste();
     SINFORGE.digital.init();
+    bindPresets();
     document.addEventListener('sinforge:digital', syncControls);
     syncControls();
     requestRender();
     // canvas text needs the webfont actually loaded: re-render once it is
     Promise.all([`700 64px ${C.FONT}`, `400 44px ${C.FONT}`].map((f) => document.fonts.load(f)))
-      .catch(() => {}).then(requestRender);
+      .catch(() => {}).then(() => { requestRender(); refreshPresets(); });
     restorePhoto();
     restoreWatermark();
     restoreLogos();

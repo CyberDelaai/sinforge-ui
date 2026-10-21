@@ -9,7 +9,9 @@ Items are removed from the list once they are implemented / resolved (no archive
 2. More decorations (hologram sticker, corner brackets,
    warning labels) and per-element colour choices.
 3. More effects: glitch slices, RGB split, worn/scratched print, holo foil.
-4. Presets: save / load complete documents (text + look), with built-in examples.
+4. Blank constructor: a left-side tab (like COMMLINK's) to build a custom blank —
+   choose the card shape / portrait frame, add and drag elements and text slots
+   on the stage, and save the result as a new blank in the picker.
 
 ## SMALL (Z version bump)
 
