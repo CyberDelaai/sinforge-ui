@@ -1091,6 +1091,7 @@
       if (sw) sw.closest('.fx-toggle').hidden = !decor.includes(k);
     });
     syncPickers();
+    syncPalette();
     $('zoomRange').value = Math.round(S.tf.zoom * 100);
     $('zoomVal').textContent = Math.round(S.tf.zoom * 100) + '%';
     $('scaleSwitch').dataset.pos = S.out.scale === 2 ? 'right' : 'left';
@@ -1149,8 +1150,9 @@
         persist.style(); syncControls(); requestRender();
       });
     });
-    // colour swatches open their hidden colour input
-    document.querySelectorAll('[data-pick]').forEach((btn) => {
+    // colour swatches open their hidden colour input (data-palette ones — card /
+    // ink / accent: the palette window, bindPalette)
+    document.querySelectorAll('[data-pick]:not([data-palette])').forEach((btn) => {
       const inp = btn.parentElement.querySelector('.fill-input');
       btn.addEventListener('click', () => {
         try { inp.showPicker(); } catch (e) { inp.click(); }
@@ -1482,6 +1484,85 @@
       if (pop.id === 'logoPop' && e.target.closest('#stage, #logoPick')) return;
       setPopOpen(null);
     });
+  }
+
+  // ---- CARD / INK / ACCENT palette window (ATLAS's colour popup): a
+  // data-palette swatch opens it beside itself for its style key — preset
+  // swatches (SINFORGE.palettes[its data-palette]; a click picks + closes) and
+  // the picker (live; it wears the colour while a non-preset one is active) ----
+  let paletteKey = null; // the style key the open window edits
+  function syncPalette() {
+    if (!paletteKey) return;
+    const cur = String(S.style[paletteKey]).toLowerCase(), pick = $('colorPopGrid').querySelector('.swatch-pick-btn');
+    let preset = false;
+    $('colorPopGrid').querySelectorAll('.swatch').forEach((sw) => {
+      const on = sw.dataset.color === cur;
+      sw.classList.toggle('active', on);
+      preset = preset || on;
+    });
+    pick.classList.toggle('has-color', !preset);
+    pick.classList.toggle('active', !preset);
+    pick.style.background = pick.style.color = preset ? '' : cur;
+    $('colorPopPick').value = cur;
+  }
+  function openPalette(btn) {
+    const pop = $('colorPop');
+    paletteKey = btn.dataset.pick;
+    buildPalette(SINFORGE.palettes[btn.dataset.palette] || SINFORGE.palettes.mark);
+    $('colorPopName').textContent = btn.closest('.fx-toggle').querySelector('.fx-label').textContent;
+    pop.hidden = false; // unhide first so it can be measured
+    syncPalette();
+    // to the left of the (right-column) swatch, else to its right; kept on screen
+    const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight, m = 12;
+    let left = r.left - pw - m;
+    if (left < 8) left = Math.min(r.right + m, window.innerWidth - pw - 8);
+    pop.style.left = Math.max(8, left) + 'px';
+    pop.style.top = Math.max(8, Math.min(r.top - 20, window.innerHeight - ph - 8)) + 'px';
+    document.querySelectorAll('[data-palette]').forEach((b) => b.setAttribute('aria-expanded', b === btn ? 'true' : 'false'));
+  }
+  function closePalette() {
+    $('colorPop').hidden = true;
+    paletteKey = null;
+    document.querySelectorAll('[data-palette]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  }
+  function setPaletteColor(c) {
+    S.style[paletteKey] = c;
+    persist.style(); syncControls(); requestRender();
+  }
+  // the opening swatch's presets, ahead of the picker's row
+  function buildPalette(colors) {
+    const grid = $('colorPopGrid');
+    grid.querySelectorAll('.swatch').forEach((sw) => sw.remove());
+    colors.forEach((hex) => {
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'swatch';
+      sw.dataset.color = hex;
+      sw.style.background = sw.style.color = hex; // color drives the .active glow
+      sw.setAttribute('aria-label', hex);
+      grid.insertBefore(sw, grid.querySelector('.grid-break'));
+    });
+  }
+  function bindPalette() {
+    const grid = $('colorPopGrid');
+    document.querySelectorAll('[data-palette]').forEach((btn) => {
+      btn.addEventListener('click', () => { if (paletteKey === btn.dataset.pick) closePalette(); else openPalette(btn); });
+    });
+    grid.addEventListener('click', (e) => {
+      const sw = e.target.closest('.swatch');
+      if (!sw || !paletteKey) return;
+      setPaletteColor(sw.dataset.color);
+      closePalette();
+    });
+    $('colorPopPick').addEventListener('input', (e) => { if (paletteKey) setPaletteColor(e.target.value); });
+    $('colorPop').querySelector('.adj-close').addEventListener('click', closePalette);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && paletteKey) closePalette(); });
+    document.addEventListener('pointerdown', (e) => {
+      if (paletteKey && !$('colorPop').contains(e.target) && !e.target.closest('[data-palette]')) closePalette();
+    });
+    // it's placed once, beside its swatch: a scroll / resize would leave it behind
+    window.addEventListener('scroll', () => { if (paletteKey) closePalette(); }, true);
+    window.addEventListener('resize', () => { if (paletteKey) closePalette(); });
   }
 
   // ---- drop / paste an image anywhere ----
@@ -2095,6 +2176,7 @@
     bindControls();
     bindStage();
     bindPops();
+    bindPalette();
     bindLicEditor();
     bindLogos();
     bindDropPaste();

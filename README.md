@@ -125,7 +125,9 @@ client-side; your images are never uploaded.
   the whole scene (an opaque image, larger than the card — OUTPUT shows its
   size).
 - **Colours** — card / ink / accent, with one-click schemes (paper, night,
-  toxic, blood, chrome, sunset). On dark schemes the photo tones flip so the
+  toxic, blood, chrome, sunset). Each colour swatch opens a palette window
+  — dark, light and bright card stocks for the card; neon, soft, light and
+  dark presets for ink and accent — plus a custom colour picker. On dark schemes the photo tones flip so the
   picture never prints as a negative.
 - **Decor** — side hazard stripes, slashes, barcode (derived from the badge
   number), edge line.

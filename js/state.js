@@ -25,6 +25,24 @@ SINFORGE.schemes = {
   chrome: { card: '#c9ccd4', ink: '#14141c', accent: '#00a8ff' },
   sunset: { card: '#ff9e3d', ink: '#1a0a2e', accent: '#ffffff' },
 };
+// The palette window's swatches, six to a row, per swatch (its data-palette):
+// `mark` (ink / accent) — the family's neon set, softer tones, then lights +
+// darks (inks for light cards); `card` — darks, lights, then bright stocks.
+// Every scheme's colours are among them, so a scheme's colours show as active.
+SINFORGE.palettes = {
+  mark: [
+    '#fcee0a', '#00f0ff', '#ff003c', '#39ff14', '#ff8800', '#c800ff',
+    '#00ff9d', '#ff10f0', '#ff1a2e', '#00a8ff', '#c8ff00', '#ff9e3d',
+    '#ff6b6b', '#feca57', '#1dd1a1', '#54a0ff', '#a29bfe', '#ff9ff3',
+    '#ffffff', '#e8e8ee', '#c9ccd4', '#14141c', '#1a0a2e', '#050507',
+  ],
+  card: [
+    '#050507', '#0b0b10', '#14141c', '#2a2a33', '#16070a', '#1f0510',
+    '#1a0b2e', '#2b1055', '#0d1530', '#001a1f', '#0a2a2a', '#0b1f0b',
+    '#ffffff', '#e8e8ee', '#c9ccd4', '#e8e4d8', '#f5f0e1', '#d8e6f0',
+    '#c8ff00', '#ff9e3d', '#fcee0a', '#00f0ff', '#ff003c', '#ff9ff3',
+  ],
+};
 
 // Default document text (the active blank's text slots, keyed by slot id).
 SINFORGE.newDoc = () => ({
