@@ -76,6 +76,8 @@ SINFORGE.newDoc = () => ({
   access: 'ALL-ACCESS',
   zone: 'SECTOR 7 // ALL LEVELS',
   handle: '@CYBERDOGGO',
+  // custom blanks (js/custom.js): their text items' values, by item id
+  custom: {},
 });
 
 // Default look: colours, decorations, photo + card effects.

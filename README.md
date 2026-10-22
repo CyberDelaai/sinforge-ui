@@ -47,6 +47,29 @@ client-side; your images are never uploaded.
   division, the holder's handle and name, and the organisation with the code:
   a QR / 2D code sits square in the corner beside it, a barcode runs full
   width under it, and with the code off the photo grows instead).
+- **Constructor** — build your own blanks: the CONSTRUCTOR tab on the left
+  edge (under PRESETS) slides out a panel. Pick a BASE SHAPE (any built-in
+  blank's silhouette, its inner contour and edge line included) and press NEW
+  BLANK: it joins the blank picker (its icon wears the name's first letter)
+  with a photo window and two text lines to start from. While the panel is
+  open the stage edits the blank: every item shows a dashed box; drag one to
+  move it, a corner of the selected one to resize it (10 px snap — Alt places
+  freely, Shift keeps the proportions), arrow keys nudge it (Shift: 10 px),
+  Delete removes it. ADD puts in text, a barcode, a chip, a band (notched like
+  the issuer bands, or plain), a rule, hazard stripes (a column, or a row when
+  wider than tall) and slashes; the item list (topmost first) restacks or
+  removes them, and the selected item's settings take exact X / Y / W / H,
+  plus its colour (ink, accent or card — card-coloured text over a band), and
+  for text a caption printed over the value, the kind (TEXT, NUMBER with a
+  generate button — the barcode encodes the first one — or DATE, printed in
+  the selected date format), weight and alignment. Each text item becomes a
+  field of the DOCUMENT panel; barcode, chip, stripes and slashes follow
+  their DECOR toggles; photo frames, codes, chips and date formats are picked
+  on the stage as on any blank once the panel is closed. Changing the base
+  scales the layout to the new shape; DUPLICATE copies a blank, DELETE BLANK
+  removes it. A preset saved on a custom blank keeps a copy of it, so the
+  preset still works — and brings the blank back — after the blank is changed
+  or deleted.
 - **Elements** — any number of your own images — decorative elements, logos,
   emblems, stamps — on any blank (the ELEMENTS strip under the
   preview: a thumbnail per element, the dashed + tile adds more — several images
@@ -159,7 +182,7 @@ client-side; your images are never uploaded.
   presets, images included, between browsers as JSON. An IMAGE STORAGE bar
   shows how much of the browser's storage the site uses and how much is left;
   a preset that doesn't fit isn't saved.
-- Text, look, framing and the uploaded photo are remembered between visits.
+- Text, look, framing, custom blanks and the uploaded photo are remembered between visits.
 - UI in 8 languages: EN · RU · FR · DE · ES · IT · JP · CN.
 
 ## Running

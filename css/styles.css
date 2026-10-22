@@ -723,6 +723,46 @@
   .storage-meter.warn .storage-bar { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
   .storage-meter.warn .storage-val { color: var(--magenta); }
 
+  /* CONSTRUCTOR panel (a second side panel, its tab under PRESETS'); the open
+     panel lies over the other's tab */
+  .side-panel.open { z-index: 51; }
+  .side-toggle.side-toggle-2 { top: 290px; } /* clear of PRESETS' tab in every language (FR: ..271) */
+  .ctor-bases .blank-opt { width: 50px; height: 50px; padding: 5px; }
+  .ctor-add { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ctor-add .blank-opt { width: 38px; height: 38px; padding: 7px; }
+  .ctor-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+  .ctor-row { display: flex; align-items: center; gap: 4px; padding: 2px 6px 2px 2px; background: var(--panel-2); border-left: 2px solid transparent; }
+  .ctor-row[aria-selected="true"] { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.25); }
+  .ctor-pick {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+    background: none; border: none; cursor: pointer; text-align: left;
+    color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px;
+  }
+  .ctor-pick svg { width: 18px; height: 18px; flex: none; color: var(--main); }
+  .ctor-row[aria-selected="true"] .ctor-pick svg, .ctor-row[aria-selected="true"] .ctor-type { color: var(--accent); }
+  .ctor-sub { min-width: 0; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ctor-act {
+    flex: none; width: 22px; height: 22px; padding: 3px; display: grid; place-items: center; cursor: pointer; line-height: 0;
+    background: var(--panel); color: var(--main); border: 1px solid rgba(var(--main-rgb),0.5);
+  }
+  .ctor-act svg { width: 100%; height: 100%; }
+  .ctor-act:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+  .ctor-act.ctor-del { color: var(--magenta); border-color: rgba(255,0,60,0.6); }
+  .ctor-act:disabled { opacity: 0.25; cursor: default; }
+  .ctor-item { margin-top: 12px; padding-top: 4px; border-top: 1px solid rgba(var(--main-rgb),0.2); }
+  .ctor-item [hidden] { display: none; }
+  .ctor-geo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .ctor-geo .field { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  .ctor-geo .field span { color: var(--dim); font-size: 10px; letter-spacing: 2px; }
+  .config .ctor-geo input[type="number"] { width: 100%; min-width: 0; padding-left: 6px; padding-right: 2px; }
+  /* constructor mode: the stage shows every item's box, the selected one's handles */
+  .stage.ctor { border-color: rgba(var(--accent-rgb),0.55); }
+  .ctor-marks { position: absolute; pointer-events: none; overflow: visible; display: none; z-index: 4; }
+  .ctor-marks.show { display: block; }
+  .ctor-marks .cm-box { fill: none; stroke: var(--main); stroke-width: 1px; stroke-dasharray: 4 4; opacity: 0.75; vector-effect: non-scaling-stroke; }
+  .ctor-marks .cm-sel { stroke: var(--accent); stroke-width: 1.5px; stroke-dasharray: none; opacity: 1; fill: rgba(var(--accent-rgb),0.06); }
+  .ctor-marks .cm-handle { fill: var(--accent); stroke: var(--bg); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+
   @media (max-width: 1100px) {
     .config-col { width: 100%; }
     /* no column beside the stage: drop the window inside it, under the icons */

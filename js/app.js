@@ -51,7 +51,8 @@
     logos: () => SINFORGE.save('sinforge:logos', JSON.stringify(S.logos)),
   };
   function restore() {
-    const b = (() => { try { return localStorage.getItem('sinforge:blank'); } catch (e) { return null; } })();
+    SINFORGE.custom.load(); // custom blanks first: S.blank / S.logos may name one
+    const b =(() => { try { return localStorage.getItem('sinforge:blank'); } catch (e) { return null; } })();
     if (b && SINFORGE.blanks[b]) S.blank = b;
     merge(S.doc, load('sinforge:doc'));
     merge(S.style, load('sinforge:style'));
@@ -86,6 +87,8 @@
     Object.keys(S.doc.licCaps).forEach((key) => {
       if (!SINFORGE.licenses[key] || typeof S.doc.licCaps[key] !== 'string') delete S.doc.licCaps[key];
     });
+    if (!S.doc.custom || Array.isArray(S.doc.custom)) S.doc.custom = {};
+    Object.keys(S.doc.custom).forEach((id) => { if (typeof S.doc.custom[id] !== 'string') delete S.doc.custom[id]; });
   }
 
   // ---- render scheduling: at most one preview render per frame ----
@@ -100,6 +103,7 @@
       SINFORGE.render(cv.getContext('2d'), 1);
       SINFORGE.digital.sync();
       syncLogoMark();
+      syncCtorMarks();
       markActivePreset(); // every edit renders: the matching preset lights up
     });
   }
@@ -439,31 +443,41 @@
       + (m ? `<text class="bi-letter" x="${m.x}" y="${m.y}" font-size="${m.size}" text-anchor="middle" dominant-baseline="central">${m.ch}</text>` : '')
       + '</svg>';
   }
+  // a blank's name: the built-ins' translated, a custom blank's as typed
+  // (`def`: a preset's own copy of a custom blank that may be gone)
+  function blankName(key, def) {
+    const d = SINFORGE.custom.def(key) || def;
+    return d ? d.name : t('bl_' + key.replace(/-/g, '_'));
+  }
+  function switchBlank(key) {
+    if (S.blank === key) return;
+    S.blank = key;
+    S.logoSel = null;
+    SINFORGE.save('sinforge:blank', S.blank);
+    syncBlankPick();
+    buildTextFields();
+    syncControls();
+    syncCtor();
+    requestRender();
+  }
+  // the built-ins, then the custom blanks (js/custom.js)
   function buildBlankSelect() {
     const box = $('blankPick');
     box.innerHTML = '';
-    SINFORGE.blankOrder.forEach((key) => {
-      const k = 'bl_' + key.replace(/-/g, '_');
+    SINFORGE.blankOrder.concat(SINFORGE.customOrder).forEach((key) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'blank-opt';
       btn.dataset.blank = key;
       btn.setAttribute('role', 'radio');
-      btn.setAttribute('data-i18n-title', k);
-      btn.title = t(k);
+      if (!SINFORGE.custom.isKey(key)) btn.setAttribute('data-i18n-title', 'bl_' + key.replace(/-/g, '_'));
+      else btn.classList.add('custom');
+      btn.title = blankName(key);
       btn.innerHTML = blankIcon(SINFORGE.blanks[key]);
-      btn.onclick = () => {
-        if (S.blank === key) return;
-        S.blank = key;
-        S.logoSel = null;
-        SINFORGE.save('sinforge:blank', S.blank);
-        syncBlankPick();
-        buildTextFields();
-        syncControls();
-        requestRender();
-      };
+      btn.onclick = () => switchBlank(key);
       box.appendChild(btn);
     });
+    iconSig = '';
     syncBlankPick();
   }
   function syncBlankPick() {
@@ -646,17 +660,23 @@
       const id = 'txt_' + slot.id;
       const lab = document.createElement('label');
       lab.htmlFor = id;
-      lab.textContent = t(slot.label);
-      lab.setAttribute('data-i18n', slot.label);
+      // a custom blank's field (js/custom.js): labelled by its caption, the
+      // value kept in S.doc.custom
+      const vals = slot.custom ? S.doc.custom : S.doc;
+      if (slot.custom) lab.textContent = slot.text || t('it_text') + ' ' + slot.n;
+      else {
+        lab.textContent = t(slot.label);
+        lab.setAttribute('data-i18n', slot.label);
+      }
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.id = id;
       inp.maxLength = slot.max;
       inp.spellcheck = false;
-      inp.value = S.doc[slot.id] || '';
+      inp.value = vals[slot.id] || '';
       if (slot.date) inp.placeholder = 'YYYY-MM-DD';
       inp.addEventListener('input', () => {
-        S.doc[slot.id] = inp.value;
+        vals[slot.id] = inp.value;
         persist.doc();
         requestRender();
       });
@@ -1324,7 +1344,9 @@
   function bindStage() {
     const cv = $('docCanvas');
     let drag = null;
+    // (in constructor mode the stage edits the custom blank instead: bindCtor)
     cv.addEventListener('pointerdown', (e) => {
+      if (ctorOn()) return;
       const p = docPoint(e), hit = hitAt(p) || (onWatermark(p) && 'wm');
       // a press on a logo selects it; anywhere else lets the selected one go
       const lid = hit === 'logo' ? logoAt(p).id : null;
@@ -1341,6 +1363,7 @@
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener('pointermove', (e) => {
+      if (ctorOn()) return;
       const p = docPoint(e);
       if (!drag) {
         // heading for the license pencil / reset (they overhang their tile):
@@ -1401,6 +1424,7 @@
     cv.addEventListener('pointercancel', () => { drag = null; cv.classList.remove('dragging'); });
     // a double-click on an empty part of the card centres the watermark again
     cv.addEventListener('dblclick', (e) => {
+      if (ctorOn()) return;
       const p = docPoint(e);
       if (hitAt(p) || !onWatermark(p)) return;
       S.style.wmX = S.style.wmY = 0;
@@ -1435,6 +1459,7 @@
     });
     window.addEventListener('resize', closeStagePops);
     cv.addEventListener('wheel', (e) => {
+      if (ctorOn()) return;
       const p = docPoint(e);
       if (hitAt(p) === 'logo') {
         // resize the logo about the point under the pointer (and select it)
@@ -1675,7 +1700,14 @@
       delete pImgs[id];
     });
   }
-  const validPreset = (p) => !!(p && SINFORGE.blanks[p.blank]
+  // a preset on a custom blank carries a copy of it (p.custom): the blank as
+  // saved, cleaned up — null for a built-in or a copy that doesn't fit
+  function presetCustom(p) {
+    if (!SINFORGE.custom.isKey(p.blank)) return null;
+    const d = SINFORGE.custom.sanitize(p.custom);
+    return d && SINFORGE.custom.key(d) === p.blank ? d : null;
+  }
+  const validPreset = (p) => !!(p && (SINFORGE.custom.isKey(p.blank) ? presetCustom(p) : SINFORGE.blanks[p.blank])
     && p.doc && typeof p.doc === 'object' && p.style && typeof p.style === 'object');
   // Built-in EXAMPLE documents, one per blank: overrides on the pristine
   // defaults, never stored, so they're read-only, stay current and never reach
@@ -1745,6 +1777,9 @@
   // re-recorded by the next preview render
   const THUMB = { w: 76, h: 56 };
   function renderPresetThumb(canvas, p) {
+    // a custom blank as the preset saved it (put back afterwards)
+    const cd = presetCustom(p), had = SINFORGE.blanks[p.blank];
+    if (cd) SINFORGE.blanks[p.blank] = SINFORGE.custom.build(cd);
     const s = presetState(p), B = SINFORGE.blanks[s.blank];
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const f = Math.min(THUMB.w / B.w, THUMB.h / B.h);
@@ -1764,7 +1799,10 @@
       S.licIcons = {};
       Object.keys(im.lic).forEach((k) => { if (pImgs[im.lic[k]]) S.licIcons[k] = pImgs[im.lic[k]]; });
     }
-    try { SINFORGE.render(canvas.getContext('2d'), f * dpr); } finally { Object.assign(S, keep); }
+    try { SINFORGE.render(canvas.getContext('2d'), f * dpr); } finally {
+      Object.assign(S, keep);
+      if (cd) { if (had) SINFORGE.blanks[p.blank] = had; else delete SINFORGE.blanks[p.blank]; }
+    }
   }
   function buildPresetList() {
     const box = $('presetList'), presets = allPresets();
@@ -1806,7 +1844,7 @@
       const meta = document.createElement('div');
       meta.className = 'preset-meta';
       meta.textContent = '// ' + [p.example ? t('p_example') : presetStamp(p.savedAt),
-        t('bl_' + p.blank.replace(/-/g, '_')), ls && ls.length ? '+' + ls.length + ' ' + t('l_logo') : '',
+        blankName(p.blank, presetCustom(p)), ls && ls.length ? '+' + ls.length + ' ' + t('l_logo') : '',
         p.out ? '+OUT' : ''].filter(Boolean).join(' · ');
       const acts = document.createElement('div');
       acts.className = 'preset-actions';
@@ -1879,6 +1917,7 @@
   function storePreset(name) {
     const p = { blank: S.blank, doc: clone(S.doc), style: clone(S.style), tf: clone(S.tf), savedAt: Date.now() };
     if ($('presetWithOut').checked) p.out = clone(S.out);
+    if (SINFORGE.custom.def(S.blank)) p.custom = clone(SINFORGE.custom.def(S.blank));
     // a refused copy marks the save failed, but every copy settles first, so
     // the clean-up sees them all
     const written = [];
@@ -1932,6 +1971,13 @@
     const all = allPresets(), p = all[name];
     if (!p) return;
     if (!Object.keys(all).some((n) => presetMatches(all[n])) && !confirm(tv('c_papply', { n: name }))) return;
+    // its custom blank comes back as the preset saved it
+    const cd = presetCustom(p);
+    if (cd) {
+      SINFORGE.custom.register(cd);
+      SINFORGE.custom.persist();
+      buildBlankSelect();
+    }
     const s = presetState(p), ls = presetLayers(p);
     if (ls) {
       // the blank's elements make way for copies of the preset's (new ids:
@@ -1963,6 +2009,7 @@
     buildTextFields();
     SINFORGE.digital.set(S.out.digital); // its switch + backdrop swatches
     syncControls();
+    syncCtor();
     requestRender();
     setStatus(tv('s_papplied', { n: name }), 'ok');
   }
@@ -2057,6 +2104,7 @@
         const q = { blank: p.blank, doc: p.doc, style: p.style, savedAt: Number(p.savedAt) || Date.now() };
         if (p.out && typeof p.out === 'object') q.out = p.out;
         if (p.tf && typeof p.tf === 'object') q.tf = p.tf;
+        if (presetCustom(p)) q.custom = presetCustom(p);
         // an image (data URL) -> IndexedDB under a fresh id
         const put = (src) => {
           const blob = dataUrlToBlob(src), id = newLogoId();
@@ -2096,6 +2144,7 @@
   }
   // the side panel: its edge tab slides it in / out; Esc or a press outside closes it
   function setPresetsOpen(on) {
+    if (on && ctorPanelOpen()) setCtorOpen(false);
     const p = $('sidePresets'), tab = $('presetsToggle');
     p.classList.toggle('open', on);
     tab.setAttribute('aria-expanded', on ? 'true' : 'false');
@@ -2123,6 +2172,425 @@
     document.addEventListener('sinforge:lang', refreshPresets); // the blank names in the meta lines
     const was = (() => { try { return localStorage.getItem('sinforge:panel'); } catch (e) { return ''; } })();
     setPresetsOpen(was === 'presets');
+    if (was === 'ctor') setCtorOpen(true);
+  }
+
+  // ---- CONSTRUCTOR: a second slide-out side panel (its tab under PRESETS')
+  // that builds custom blanks (js/custom.js): a built-in base silhouette, then
+  // items laid out on the stage. While it's open on a custom blank the stage
+  // edits it (constructor mode): every item shows its box, a press selects /
+  // drags one, its corner handles resize it (10 px snap — Alt: free; Shift:
+  // keep proportions), arrows nudge (Shift: 10 px), Delete removes. The panel
+  // lists the items (topmost first) and the selected one's settings. ----
+  const CU = SINFORGE.custom;
+  const GRID = 10;
+  const ITEM_SVG = {
+    photo: '<path d="M3 5h18v14H3z" opacity=".4"/><circle cx="12" cy="11" r="3"/><path d="M7 19c0-3 2-5 5-5s5 2 5 5"/>',
+    text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+    code: '<path d="M4 5v14M7 5v14M10.5 5v14M13 5v14M17 5v14M20 5v14"/>',
+    chip: '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M5 10h4v4H5M19 10h-4v4h4M10 5v5h4V5M10 19v-5h4v5"/>',
+    band: '<path d="M6 8h15v5l-3 3H3v-5z" fill="currentColor" stroke="none"/>',
+    rule: '<path d="M3 12h18" stroke-width="3"/>',
+    stripes: '<path d="M8 3l8 4M8 9l8 4M8 15l8 4" stroke-width="2.6"/>',
+    slashes: '<path d="M3 17l4-10h3l-4 10zM10 17l4-10h3l-4 10z" fill="currentColor" stroke="none"/><path d="M17 17l4-10" stroke-width="2.6"/>',
+  };
+  const itemIcon = (type) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">' + ITEM_SVG[type] + '</svg>';
+  const UP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M6 14l6-6 6 6"/></svg>';
+  const DOWN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M6 10l6 6 6-6"/></svg>';
+  let ctorBase = null; // the base NEW BLANK starts from while a built-in is active
+  let ctorSel = null;  // the selected item's id
+  let cdrag = null;    // a stage drag in progress
+  const ctorPanelOpen = () => $('sideCtor').classList.contains('open');
+  const ctorDef = () => CU.def(S.blank);
+  function ctorOn() { return ctorPanelOpen() && !!ctorDef(); }
+  const ctorItem = () => { const d = ctorDef(); return (d && d.items.find((it) => it.id === ctorSel)) || null; };
+  const itemName = (it) => t('it_' + it.type);
+  // a text item's sample value (what a new field starts with)
+  const SAMPLE = { text: 'TEXT', serial: 'SIN-0304-7731', date: '2084-12-31' };
+
+  // an edit to the def: stored, drawn; `struct` = the item list / text fields /
+  // decor toggles changed too; `icons` = the picker icons follow (the photo
+  // box or the name moved)
+  function ctorChanged(o) {
+    o = o || {};
+    CU.persist();
+    if (o.struct) {
+      buildTextFields();
+      buildCtorList();
+    }
+    if (o.icons || o.struct) iconSig = '';
+    if (o.icons || o.struct) syncControls();
+    syncCtorItem();
+    requestRender();
+  }
+  function ctorSelect(id) {
+    if (ctorSel === id) return;
+    ctorSel = id;
+    $('ctorList').querySelectorAll('.ctor-row').forEach((r) => r.setAttribute('aria-selected', String(r.dataset.item === id)));
+    syncCtorItem();
+    syncCtorMarks();
+  }
+
+  // the base picker: built-in silhouettes
+  function buildCtorBases() {
+    const box = $('ctorBases');
+    box.innerHTML = '';
+    SINFORGE.blankOrder.forEach((key) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'blank-opt';
+      btn.dataset.base = key;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('data-i18n-title', 'bl_' + key.replace(/-/g, '_'));
+      btn.title = blankName(key);
+      btn.innerHTML = blankIcon(SINFORGE.blanks[key]);
+      btn.onclick = () => setBase(key);
+      box.appendChild(btn);
+    });
+  }
+  // on a custom blank: its base changes, the items scaled along to the new
+  // size; on a built-in: the base NEW BLANK uses
+  function setBase(key) {
+    const def = ctorDef();
+    if (!def) { ctorBase = key; syncCtor(); return; }
+    if (def.base === key) return;
+    const A = SINFORGE.blanks[def.base], B = SINFORGE.blanks[key], fx = B.w / A.w, fy = B.h / A.h;
+    def.base = key;
+    def.items.forEach((it) => {
+      it.x *= fx; it.w *= fx; it.y *= fy; it.h *= fy;
+      if (it.type === 'rule' || it.type === 'stripes') { it.w = Math.max(it.w, 2); it.h = Math.max(it.h, 2); }
+      CU.fit(it, B);
+    });
+    CU.register(def); // rebuilt on the new silhouette
+    buildBlankSelect();
+    ctorChanged({ struct: true });
+  }
+  function newBlank() {
+    const cur = ctorDef();
+    const base = cur ? cur.base : ctorBase || S.blank;
+    let n = CU.defs().length + 1;
+    while (CU.defs().some((d) => d.name === 'CUSTOM ' + n)) n++;
+    const def = CU.newDef(base, 'CUSTOM ' + n);
+    const [, nameIt, noIt] = def.items;
+    S.doc.custom[nameIt.id] = [S.doc.name1, S.doc.name2].filter(Boolean).join(' ') || 'CYBER DOGGO';
+    S.doc.custom[noIt.id] = S.doc.number || SAMPLE.serial;
+    addBlank(def);
+    setStatus(tv('s_newblank', { n: def.name }), 'ok');
+  }
+  // a copy of the custom blank: new ids, the same values
+  function dupBlank() {
+    const src = ctorDef();
+    if (!src) return;
+    const def = clone(src);
+    def.id = CU.uid('c');
+    def.name = (src.name.slice(0, 19) + ' COPY').trim();
+    def.items.forEach((it) => {
+      const id = CU.uid('i');
+      if (it.type === 'text' && S.doc.custom[it.id] != null) S.doc.custom[id] = S.doc.custom[it.id];
+      it.id = id;
+    });
+    addBlank(def);
+    setStatus(tv('s_newblank', { n: def.name }), 'ok');
+  }
+  function addBlank(def) {
+    const key = CU.register(def);
+    CU.persist();
+    persist.doc();
+    buildBlankSelect();
+    ctorSel = null;
+    switchBlank(key);
+  }
+  function deleteBlank() {
+    const def = ctorDef();
+    if (!def || !confirm(tv('c_delblank', { n: def.name }))) return;
+    const key = S.blank;
+    def.items.forEach((it) => { delete S.doc.custom[it.id]; });
+    (S.logos[key] || []).map((L) => L.id).forEach(removeLogo);
+    delete S.logos[key];
+    persist.logos();
+    persist.doc();
+    CU.unregister(key);
+    CU.persist();
+    buildBlankSelect();
+    ctorSel = null;
+    switchBlank(def.base);
+    setStatus(tv('s_blankdel', { n: def.name }));
+  }
+
+  // items: added in the card's centre (stepped aside off one already there)
+  function addItem(type) {
+    const def = ctorDef();
+    if (!def) return;
+    const B = blank(), it = CU.newItem(type, B);
+    while (def.items.some((o) => o.x === it.x && o.y === it.y)) { it.x += 30; it.y += 30; CU.fit(it, B); if (it.x + it.w >= B.w) break; }
+    if (type === 'text') S.doc.custom[it.id] = SAMPLE.text;
+    def.items.push(it);
+    persist.doc();
+    ctorSel = it.id;
+    ctorChanged({ struct: true });
+  }
+  function removeItem(id) {
+    const def = ctorDef(), it = def && def.items.find((o) => o.id === id);
+    if (!it || it.type === 'photo') return; // the photo stays
+    def.items = def.items.filter((o) => o !== it);
+    delete S.doc.custom[id];
+    persist.doc();
+    if (ctorSel === id) ctorSel = null;
+    ctorChanged({ struct: true });
+  }
+  // restack one step (dir +1 = forward, -1 = backward)
+  function moveItem(id, dir) {
+    const ls = ctorDef().items, i = ls.findIndex((o) => o.id === id), j = i + dir;
+    if (i < 0 || j < 0 || j >= ls.length) return;
+    [ls[i], ls[j]] = [ls[j], ls[i]];
+    ctorChanged({ struct: true });
+  }
+
+  // the item list, topmost first: icon + name (a text item's caption / value
+  // beside it), forward / backward / remove
+  function buildCtorList() {
+    const box = $('ctorList'), def = ctorDef();
+    box.innerHTML = '';
+    if (!def) return;
+    const ls = def.items;
+    ls.slice().reverse().forEach((it) => {
+      const i = ls.indexOf(it);
+      const row = document.createElement('div');
+      row.className = 'ctor-row';
+      row.dataset.item = it.id;
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(it.id === ctorSel));
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'ctor-pick';
+      const label = it.type === 'text' ? (it.cap.trim() || S.doc.custom[it.id] || '') : '';
+      pick.innerHTML = itemIcon(it.type) + '<span class="ctor-type"></span><span class="ctor-sub"></span>';
+      pick.querySelector('.ctor-type').textContent = itemName(it);
+      pick.querySelector('.ctor-sub').textContent = label;
+      pick.onclick = () => ctorSelect(it.id);
+      const mk = (cls, svg, title, fn, off) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'ctor-act ' + cls;
+        b.innerHTML = svg;
+        b.title = title;
+        b.setAttribute('aria-label', title);
+        b.disabled = !!off;
+        b.onclick = fn;
+        return b;
+      };
+      row.append(pick,
+        mk('', UP_SVG, t('b_logoup'), () => moveItem(it.id, 1), i === ls.length - 1),
+        mk('', DOWN_SVG, t('b_logodown'), () => moveItem(it.id, -1), i === 0),
+        mk('ctor-del', TRASH_SVG, t('b_logodel'), () => removeItem(it.id), it.type === 'photo'));
+      box.appendChild(row);
+    });
+  }
+  // the selected item's settings: [data-item] rows for its type only
+  function syncCtorItem() {
+    const it = ctorItem(), box = $('ctorItem');
+    box.hidden = !it;
+    if (!it) return;
+    $('ctorItemName').textContent = itemName(it);
+    box.querySelectorAll('[data-for]').forEach((el) => { el.hidden = !el.dataset.for.split(' ').includes(it.type); });
+    box.querySelectorAll('[data-item]').forEach((el) => {
+      const v = it[el.dataset.item];
+      if (v === undefined) return;
+      if (el.classList.contains('side-switch')) el.dataset.pos = v ? 'right' : 'left';
+      else if (el !== document.activeElement) el.value = typeof v === 'number' ? Math.round(v) : v;
+    });
+  }
+  // the whole panel: the base picker, then the custom blank's editor (or the
+  // intro on a built-in); the stage enters / leaves constructor mode
+  function syncCtor() {
+    const def = ctorDef();
+    if (ctorSel && !ctorItem()) ctorSel = null;
+    const base = def ? def.base : ctorBase || S.blank;
+    $('ctorBases').querySelectorAll('.blank-opt').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.base === base)));
+    $('ctorIntro').hidden = !!def;
+    $('ctorEdit').hidden = !def;
+    $('ctorDup').disabled = !def;
+    if (def && document.activeElement !== $('ctorName')) $('ctorName').value = def.name;
+    buildCtorList();
+    syncCtorItem();
+    const on = ctorOn();
+    $('stage').classList.toggle('ctor', on);
+    if (on) { selectLogo(null); showHover(null); closeStagePops(); }
+    else { cdrag = null; $('docCanvas').style.cursor = ''; }
+    syncCtorMarks();
+  }
+
+  // the stage overlay: every item's box (dashed), the selected one solid with
+  // a handle on each corner, in native px over the canvas as drawn
+  const HANDLE = 10; // a handle's side, screen px
+  function syncCtorMarks() {
+    const svg = $('ctorMarks'), def = ctorOn() && ctorDef();
+    svg.classList.toggle('show', !!def);
+    if (!def) return;
+    placeOverlay(svg);
+    const hs = HANDLE / drawnRect().f, sel = ctorItem();
+    let html = '';
+    def.items.forEach((it) => {
+      if (it !== sel) html += `<rect class="cm-box" x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}"/>`;
+    });
+    if (sel) {
+      html += `<rect class="cm-box cm-sel" x="${sel.x}" y="${sel.y}" width="${sel.w}" height="${sel.h}"/>`;
+      corners(sel).forEach(([, x, y]) => { html += `<rect class="cm-handle" x="${x - hs / 2}" y="${y - hs / 2}" width="${hs}" height="${hs}"/>`; });
+    }
+    svg.innerHTML = html;
+  }
+  const corners = (it) => [['nw', it.x, it.y], ['ne', it.x + it.w, it.y], ['sw', it.x, it.y + it.h], ['se', it.x + it.w, it.y + it.h]];
+  // what a press hits: a handle of the selected item, else an item (the
+  // selected one first, then the topmost); thin items get a little slack
+  function ctorHit(p) {
+    const def = ctorDef(), sel = ctorItem(), f = drawnRect().f, tol = 8 / f;
+    if (sel) {
+      const h = corners(sel).find(([, x, y]) => Math.abs(p.x - x) <= tol && Math.abs(p.y - y) <= tol);
+      if (h) return { it: sel, mode: h[0] };
+    }
+    const pad = 4 / f;
+    const hits = (it) => p.x >= it.x - pad && p.x <= it.x + it.w + pad && p.y >= it.y - pad && p.y <= it.y + it.h + pad;
+    if (sel && hits(sel)) return { it: sel, mode: 'move' };
+    for (let i = def.items.length - 1; i >= 0; i--) if (hits(def.items[i])) return { it: def.items[i], mode: 'move' };
+    return null;
+  }
+  const CURSORS = { move: 'move', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
+  // a drag: move keeps the box on the card; a corner moves against the
+  // opposite one (min size, Shift / a chip: the start's proportions)
+  function ctorDragTo(p, e) {
+    const d = cdrag, it = d.it, B = blank(), b = d.box;
+    const snap = (v) => (e.altKey ? v : Math.round(v / GRID) * GRID);
+    if (d.mode === 'move') {
+      it.x = clamp(snap(b.x + p.x - d.p.x), 0, B.w - it.w);
+      it.y = clamp(snap(b.y + p.y - d.p.y), 0, B.h - it.h);
+      return;
+    }
+    const min = it.type === 'rule' ? 2 : CU.MIN;
+    const west = d.mode[1] === 'w', north = d.mode[0] === 'n';
+    const ax = west ? b.x + b.w : b.x, ay = north ? b.y + b.h : b.y; // the anchored corner
+    let w = Math.max(min, west ? ax - snap(clamp(p.x, 0, B.w)) : snap(clamp(p.x, 0, B.w)) - ax);
+    let h = Math.max(min, north ? ay - snap(clamp(p.y, 0, B.h)) : snap(clamp(p.y, 0, B.h)) - ay);
+    if (e.shiftKey || it.type === 'chip') {
+      const q = Math.max(w / b.w, h / b.h);
+      w = Math.max(min, b.w * q); h = Math.max(min, b.h * q);
+    }
+    it.w = w; it.h = h;
+    it.x = west ? ax - w : ax;
+    it.y = north ? ay - h : ay;
+    CU.fit(it, B);
+  }
+  function bindCtor() {
+    buildCtorBases();
+    const add = $('ctorAdd');
+    CU.ADDABLE.forEach((type) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'blank-opt ctor-addbtn';
+      b.dataset.type = type;
+      b.setAttribute('data-i18n-title', 'it_' + type);
+      b.title = t('it_' + type);
+      b.setAttribute('aria-label', t('it_' + type));
+      b.innerHTML = itemIcon(type);
+      b.onclick = () => addItem(type);
+      add.appendChild(b);
+    });
+    $('ctorNew').addEventListener('click', newBlank);
+    $('ctorDup').addEventListener('click', dupBlank);
+    $('ctorDelete').addEventListener('click', deleteBlank);
+    $('ctorName').addEventListener('input', (e) => {
+      const def = ctorDef();
+      if (!def) return;
+      def.name = e.target.value.toUpperCase().slice(0, 24) || 'CUSTOM';
+      CU.persist();
+      buildBlankSelect(); // its tooltip + icon letter
+    });
+    $('ctorName').addEventListener('change', (e) => { const def = ctorDef(); if (def) e.target.value = def.name; });
+    // the selected item's settings
+    $('ctorItem').querySelectorAll('[data-item]').forEach((el) => {
+      const key = el.dataset.item;
+      const set = (v) => {
+        const it = ctorItem();
+        if (!it) return;
+        it[key] = v;
+        if ('xywh'.includes(key)) CU.fit(it, blank());
+        // a caption relabels its field; a kind change regenerates nothing, but
+        // a date field gets a date to show
+        if (key === 'kind' && v === 'date' && !SINFORGE.parseDate(S.doc.custom[it.id] || '')) { S.doc.custom[it.id] = SAMPLE.date; persist.doc(); }
+        ctorChanged({ struct: key === 'cap' || key === 'kind', icons: it.type === 'photo' });
+      };
+      if (el.classList.contains('side-switch')) { el.addEventListener('click', () => { const it = ctorItem(); if (it) set(!it[key]); }); return; }
+      el.addEventListener('input', () => {
+        const it = ctorItem();
+        if (!it) return;
+        if (typeof it[key] !== 'number') { set(el.value); return; }
+        const v = Number(el.value);
+        if (el.value !== '' && isFinite(v)) set(v);
+      });
+      if (el.type === 'number') el.addEventListener('change', () => syncCtorItem()); // shows the value as fitted
+    });
+    // the panel: its tab slides it in / out (opening it closes PRESETS);
+    // it stays open while the stage is edited
+    $('ctorToggle').addEventListener('click', () => setCtorOpen(!ctorPanelOpen()));
+    // stage: select / move / resize items
+    const cv = $('docCanvas');
+    cv.addEventListener('pointerdown', (e) => {
+      if (!ctorOn()) return;
+      const p = docPoint(e), hit = ctorHit(p);
+      ctorSelect(hit ? hit.it.id : null);
+      if (!hit) return;
+      const it = hit.it;
+      cdrag = { mode: hit.mode, it, p, box: { x: it.x, y: it.y, w: it.w, h: it.h }, moved: false };
+      cv.setPointerCapture(e.pointerId);
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (!ctorOn()) return;
+      const p = docPoint(e);
+      if (!cdrag) {
+        const hit = ctorHit(p);
+        cv.style.cursor = hit ? CURSORS[hit.mode] : '';
+        return;
+      }
+      cdrag.moved = true;
+      ctorDragTo(p, e);
+      syncCtorItem();
+      requestRender();
+    });
+    const end = () => {
+      if (!cdrag) return;
+      const { moved, it } = cdrag;
+      cdrag = null;
+      if (moved) ctorChanged({ icons: it.type === 'photo' });
+    };
+    cv.addEventListener('pointerup', end);
+    cv.addEventListener('pointercancel', end);
+    // keys: arrows nudge the selected item, Delete removes it, Escape lets go
+    // (not while typing in a field)
+    document.addEventListener('keydown', (e) => {
+      if (!ctorOn() || !$('cropModal').hidden || (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))) return;
+      const it = ctorItem();
+      if (!it) return;
+      const step = e.shiftKey ? GRID : 1, B = blank();
+      const nudge = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (nudge) {
+        e.preventDefault();
+        it.x += nudge[0]; it.y += nudge[1];
+        CU.fit(it, B);
+        ctorChanged({ icons: it.type === 'photo' });
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        removeItem(it.id);
+      } else if (e.key === 'Escape') ctorSelect(null);
+    });
+    window.addEventListener('resize', syncCtorMarks);
+    document.addEventListener('sinforge:lang', () => { buildCtorList(); syncCtorItem(); });
+  }
+  function setCtorOpen(on) {
+    if (on && panelOpen()) setPresetsOpen(false);
+    $('sideCtor').classList.toggle('open', on);
+    $('ctorToggle').setAttribute('aria-expanded', on ? 'true' : 'false');
+    $('ctorArrow').textContent = on ? '<' : '>';
+    if (on || !panelOpen()) SINFORGE.save('sinforge:panel', on ? 'ctor' : '');
+    syncCtor();
   }
 
   // ---- export ----
@@ -2180,6 +2648,7 @@
     bindLicEditor();
     bindLogos();
     bindDropPaste();
+    bindCtor();
     SINFORGE.digital.init();
     bindPresets();
     document.addEventListener('sinforge:digital', syncControls);

@@ -9,9 +9,10 @@ Items are removed from the list once they are implemented / resolved (no archive
 2. More decorations (hologram sticker, corner brackets,
    warning labels) and per-element colour choices.
 3. More effects: glitch slices, RGB split, worn/scratched print, holo foil.
-4. Blank constructor: a left-side tab (like COMMLINK's) to build a custom blank —
-   choose the card shape / portrait frame, add and drag elements and text slots
-   on the stage, and save the result as a new blank in the picker.
+4. Blank constructor follow-ups: own card shapes (parametric corners / notches,
+   not only the built-in silhouettes), multi-select + alignment guides on the
+   stage, a name-generator binding for text items, and an editing layout for
+   phone widths (the open panel covers the stage there).
 
 ## SMALL (Z version bump)
 
